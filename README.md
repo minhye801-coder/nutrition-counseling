@@ -83,4 +83,6 @@ https://nutrition-counseling.pages.dev
 ## 데이터 저장
 
 학생 이름과 학년·반·번호는 입력받지 않습니다.  
-탐험기록, 미션, 배지, 게임 결과는 브라우저 localStorage에만 저장됩니다.
+탐험기록, 미션, 배지, 게임 결과는 브라우저 localStorage에만 저장됩니다
+
+배포확인
