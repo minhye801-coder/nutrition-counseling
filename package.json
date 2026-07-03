@@ -1,0 +1,15 @@
+{
+  "name": "nutrition-counseling",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "description": "맛마음 탐험소 Lite 공용 체험형 · 전국 학교급식 기반 식생활 탐험 웹앱",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "check": "node --check src/index.js && node --check public/app.js"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}
