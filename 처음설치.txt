@@ -1,0 +1,88 @@
+nutrition-counseling · Cloudflare Pages 수정 완성본
+====================================================
+
+이 파일은 기존 nutrition-counseling.pages.dev 프로젝트에서 사용하는 버전입니다.
+
+이전 Workers 전용 파일은 사용하지 않습니다.
+이번 파일은 Cloudflare Pages + Pages Functions 구조입니다.
+
+GitHub 저장소 최상단 구조
+------------------------
+public
+functions
+package.json
+README.md
+.gitignore
+.dev.vars.example
+
+중요:
+- public 안에 index.html이 있습니다.
+- functions/api 안에 학교 검색과 급식 조회 API가 있습니다.
+- ZIP 자체를 올리지 말고 압축을 풀어 안의 파일과 폴더를 올립니다.
+
+Cloudflare Pages 빌드 설정
+-------------------------
+Framework preset: None
+Build command: exit 0
+Build output directory: public
+Root directory: 비워 둠
+
+정상 주소
+---------
+https://nutrition-counseling.pages.dev
+
+이제 pages.dev 주소가 정상 주소입니다.
+
+NEIS 인증키 등록
+---------------
+Cloudflare
+→ Workers & Pages
+→ nutrition-counseling 프로젝트
+→ Settings
+→ Variables and Secrets
+→ Add
+
+Variable name: NEIS_API_KEY
+Type: Secret 또는 Encrypt 선택
+Value: 나이스 인증키
+
+Production 환경에 등록합니다.
+
+등록 후 반드시 새 배포
+---------------------
+GitHub에서 파일을 Commit한 뒤 Cloudflare 배포가 끝날 때까지 기다립니다.
+Secret을 배포 뒤에 추가했다면 Deployments에서 Retry deployment 또는 새 Commit을 실행합니다.
+
+확인 순서
+---------
+1. https://nutrition-counseling.pages.dev/api/config 열기
+2. 아래와 비슷한 JSON이 나오면 Functions 연결 성공
+
+{
+  "ok": true,
+  "data": {
+    "systemName": "맛마음 탐험소 Lite",
+    "apiKeyRegistered": true
+  }
+}
+
+3. 메인 주소 열기
+   https://nutrition-counseling.pages.dev
+
+4. 학교 검색
+5. 급식 조회
+6. 탐험 저장
+7. 새로고침 후 기록 유지 확인
+
+계속 404일 때
+------------
+Cloudflare Pages 설정의 Build output directory가 반드시 public인지 확인합니다.
+
+잘못된 예:
+- 비어 있음
+- /
+- dist
+- nutrition-counseling
+
+올바른 값:
+public
