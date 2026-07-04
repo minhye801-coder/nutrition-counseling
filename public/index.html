@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
+<title>맛마음 탐험소 Lite</title>
+<meta name="description" content="전국 학교급식 기반 식생활 탐험 웹앱" />
+<link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+<div id="loadingOverlay" class="loading-overlay" hidden aria-live="polite" aria-busy="true">
+  <div class="loading-spinner" aria-hidden="true"></div>
+  <p>불러오는 중이에요...</p>
+</div>
+
+<header class="app-header">
+  <div class="app-header-inner">
+    <button id="homeBtn" type="button" class="app-title-btn" aria-label="홈으로">
+      <span class="app-title">🍚 맛마음 탐험소 <span class="lite-badge">Lite</span></span>
+    </button>
+    <button id="changeSchoolBtn" type="button" class="btn btn-ghost" hidden>학교 변경</button>
+  </div>
+</header>
+
+<main id="app" class="app-main" role="main"></main>
+
+<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+<noscript>이 웹앱을 사용하려면 자바스크립트를 사용할 수 있도록 설정해 주세요.</noscript>
+
+<script src="/app.js"></script>
+</body>
+</html>

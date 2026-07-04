@@ -1,0 +1,14 @@
+{
+  "name": "nutrition-counseling",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "맛마음 탐험소 Lite - 전국 학교급식 기반 식생활 탐험 웹앱 (Cloudflare Pages)",
+  "scripts": {
+    "dev": "wrangler pages dev public",
+    "check": "node --check public/app.js && node --check functions/_lib/neis.js && node --check functions/api/config.js && node --check functions/api/schools.js && node --check functions/api/meals.js"
+  },
+  "devDependencies": {
+    "wrangler": "^4.20.0"
+  }
+}
