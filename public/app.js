@@ -92,6 +92,51 @@
     { id: 'b5_2', session: 5, icon: '🧭', name: '맛마음 안내자', desc: '5회기 탐험을 모두 마친 맛마음 탐험소의 안내자예요.' },
   ];
 
+  // Direct conversation-starter questions a nutrition teacher can ask the
+  // student during counseling, themed to match each session's badge story.
+  var TALK_CARDS = {
+    1: {
+      theme: '관찰과 표현',
+      questions: [
+        '오늘 급식에서 가장 먼저 눈에 띈 음식은 뭐였어?',
+        '그 음식을 보고 어떤 생각이 들었어?',
+        '오늘 급식 중에 제일 맛있어 보였던 건 뭐야?',
+      ],
+    },
+    2: {
+      theme: '감각과 어려움',
+      questions: [
+        '그 음식은 냄새, 맛, 식감 중에 뭐가 제일 힘들었어?',
+        '비슷하게 힘들었던 음식이 또 있었어?',
+        '그 음식을 다시 만나면 어떤 기분이 들 것 같아?',
+      ],
+    },
+    3: {
+      theme: '전략과 미션',
+      questions: [
+        '오늘 세운 전략, 실제로 해보니까 어땠어?',
+        '다음에 비슷한 음식을 만나면 어떤 방법을 써볼 수 있을까?',
+        '이 전략을 친구한테도 알려준다면 뭐라고 말해줄 거야?',
+      ],
+    },
+    4: {
+      theme: '실천과 도움',
+      questions: [
+        '요즘 꾸준히 해보니까 뭐가 달라진 것 같아?',
+        '도움이 필요할 때 누구한테 도움을 요청할 수 있을까?',
+        '도움을 요청하는 게 어렵게 느껴질 때는 언제야?',
+      ],
+    },
+    5: {
+      theme: '성장과 안내',
+      questions: [
+        '탐험을 처음 시작했을 때랑 지금이랑 비교하면 뭐가 달라졌어?',
+        '지금까지 중에 가장 뿌듯했던 순간은 언제였어?',
+        '앞으로 더 도전해보고 싶은 음식이 있어?',
+      ],
+    },
+  };
+
   var GAMES = [
     {
       id: 'sense',
@@ -260,6 +305,7 @@
   }
 
   var BACKUP_GAME_CAP = 10;
+  var BACKUP_TALK_CAP = 5;
 
   function utf8ToBase64Url(str) {
     var bytes = new TextEncoder().encode(str);
@@ -297,6 +343,9 @@
       }),
       gr: record.gameResults.slice(-BACKUP_GAME_CAP).map(function (g) {
         return [g.game, g.score, g.total, (g.playedAt || '').slice(0, 10)];
+      }),
+      tn: (record.talkNotes || []).slice(-BACKUP_TALK_CAP).map(function (n) {
+        return [n.session, n.theme, n.questions, n.answers, (n.savedAt || '').slice(0, 10)];
       }),
     };
     return utf8ToBase64Url(JSON.stringify(compact));
@@ -340,7 +389,17 @@
       })[0];
       return { game: a[0], gameName: game ? game.name : a[0], score: a[1], total: a[2], playedAt: a[3] + 'T00:00:00.000Z' };
     });
-    return { schoolInfo: schoolInfo, nickname: nickname, sessions: sessions, missionChecks: missionChecks, gameResults: gameResults };
+    var talkNotes = (compact.tn || []).map(function (a) {
+      return { session: a[0], theme: a[1], questions: a[2], answers: a[3], savedAt: a[4] + 'T00:00:00.000Z' };
+    });
+    return {
+      schoolInfo: schoolInfo,
+      nickname: nickname,
+      sessions: sessions,
+      missionChecks: missionChecks,
+      gameResults: gameResults,
+      talkNotes: talkNotes,
+    };
   }
 
   function applyRestoreCode(code) {
@@ -364,11 +423,13 @@
       sessions: decoded.sessions,
       missionChecks: decoded.missionChecks,
       gameResults: decoded.gameResults,
+      talkNotes: decoded.talkNotes,
     };
     state.store.currentSchoolKey = key;
     state.wizard = null;
     state.gameSession = null;
     state.todayMeal = null;
+    state.talkSession = null;
     saveStore(state.store);
     showToast(decoded.schoolInfo.schoolName + ' · ' + decoded.nickname + '의 기록을 불러왔어요!');
     return true;
@@ -491,6 +552,7 @@
         sessions: [],
         missionChecks: [],
         gameResults: [],
+        talkNotes: [],
       };
     } else {
       store.schools[key].schoolInfo = schoolInfo;
@@ -656,6 +718,9 @@
       case 'missionReview':
         renderMissionReview(app);
         break;
+      case 'talkCards':
+        renderTalkCards(app);
+        break;
       case 'gamesList':
         renderGamesList(app);
         break;
@@ -817,6 +882,7 @@
         state.wizard = null;
         state.gameSession = null;
         state.todayMeal = null;
+        state.talkSession = null;
         setScreen('main');
       });
     });
@@ -832,6 +898,7 @@
       state.wizard = null;
       state.gameSession = null;
       state.todayMeal = null;
+      state.talkSession = null;
       showToast(nickname + '(으)로 시작해요!');
       setScreen('main');
     });
@@ -844,6 +911,7 @@
   var MENU_ITEMS = [
     { id: 'explore', icon: '🧭', title: '오늘의 탐험', desc: '급식으로 오늘의 탐험을 시작해요' },
     { id: 'missionReview', icon: '📝', title: '미션 돌아보기', desc: '내가 만든 미션을 점검해요' },
+    { id: 'talkCards', icon: '🔮', title: '오늘의 한마디', desc: '카드를 뒤집으며 대화를 나눠봐요' },
     { id: 'gamesList', icon: '🎮', title: '자유게임', desc: '재미있는 식생활 게임을 해요' },
     { id: 'badges', icon: '🏅', title: '나의 배지', desc: '모은 배지를 확인해요' },
     { id: 'notes', icon: '📓', title: '탐험노트', desc: '나의 탐험 기록을 모아봐요' },
@@ -1367,6 +1435,129 @@
   }
 
   /* ---------------------------------------------------------------- */
+  /* Screen: 오늘의 한마디 (질문 카드)                                     */
+  /* ---------------------------------------------------------------- */
+
+  function talkThemeKeyFor(record) {
+    return Math.min(Math.max(completedSessionCount(record), 1), 5);
+  }
+
+  function ensureTalkSession(record) {
+    if (!state.talkSession) {
+      var themeKey = talkThemeKeyFor(record);
+      var count = TALK_CARDS[themeKey].questions.length;
+      state.talkSession = {
+        themeKey: themeKey,
+        flipped: new Array(count).fill(false),
+        answers: new Array(count).fill(''),
+      };
+    }
+    return state.talkSession;
+  }
+
+  function renderTalkHistory(record) {
+    var notes = (record.talkNotes || [])
+      .slice()
+      .reverse()
+      .slice(0, 3);
+    if (!notes.length) return '';
+    var items = notes
+      .map(function (n) {
+        var lines = n.questions
+          .map(function (q, i) {
+            var a = n.answers[i];
+            return '<dt>' + escapeHtml(q) + '</dt><dd>' + (a ? escapeHtml(a) : '<span class="text-muted">(기록 없음)</span>') + '</dd>';
+          })
+          .join('');
+        return '<div class="note-entry"><div class="note-meta">' + n.session + '회기 테마 · ' + escapeHtml(n.theme) + '</div><dl>' + lines + '</dl></div>';
+      })
+      .join('');
+    return '<h3 class="mt-1">최근 기록</h3>' + items;
+  }
+
+  function renderTalkCards(app) {
+    var record = getCurrentRecord(state.store);
+    if (!record) {
+      setScreen('schoolSelect');
+      return;
+    }
+    var session = ensureTalkSession(record);
+    var theme = TALK_CARDS[session.themeKey];
+
+    var cardsHtml = theme.questions
+      .map(function (q, i) {
+        var flipped = session.flipped[i];
+        return (
+          '<div class="tarot-card' + (flipped ? ' flipped' : '') + '" data-tarot-idx="' + i + '">' +
+          '<div class="tarot-card-inner">' +
+          '<div class="tarot-face tarot-back">✨</div>' +
+          '<div class="tarot-face tarot-front">' +
+          '<p class="tarot-question">' + escapeHtml(q) + '</p>' +
+          '<input type="text" class="tarot-answer-input" data-tarot-answer="' + i + '" maxlength="80" value="' + escapeHtml(session.answers[i]) + '" placeholder="한 줄로 적어볼까요? (선택)" />' +
+          '</div>' +
+          '</div>' +
+          '</div>'
+        );
+      })
+      .join('');
+
+    app.innerHTML =
+      '<div class="screen">' +
+      '<h2 class="screen-title">오늘의 한마디</h2>' +
+      '<p class="screen-subtitle">' + session.themeKey + '회기 테마 · ' + escapeHtml(theme.theme) + ' — 카드를 눌러 뒤집어 보세요</p>' +
+      '<div class="card">' +
+      '<div class="tarot-grid">' + cardsHtml + '</div>' +
+      '<div class="wizard-actions mt-1"><button type="button" class="btn btn-block" id="finishTalkBtn">기록하고 마치기</button></div>' +
+      '</div>' +
+      renderTalkHistory(record) +
+      '</div>';
+
+    $all('.tarot-card', app).forEach(function (cardEl) {
+      cardEl.addEventListener('click', function (e) {
+        if (e.target.closest('.tarot-answer-input')) return;
+        var idx = Number(cardEl.getAttribute('data-tarot-idx'));
+        if (session.flipped[idx]) return;
+        session.flipped[idx] = true;
+        render();
+      });
+    });
+
+    $all('[data-tarot-answer]', app).forEach(function (input) {
+      input.addEventListener('input', function () {
+        var idx = Number(input.getAttribute('data-tarot-answer'));
+        session.answers[idx] = input.value;
+      });
+      input.addEventListener('click', function (e) {
+        e.stopPropagation();
+      });
+    });
+
+    $('#finishTalkBtn').addEventListener('click', function () {
+      var anyFlipped = session.flipped.some(Boolean);
+      if (!anyFlipped) {
+        showToast('카드를 하나 이상 뒤집어 봐주세요.');
+        return;
+      }
+      record.talkNotes = record.talkNotes || [];
+      record.talkNotes.push({
+        session: session.themeKey,
+        theme: theme.theme,
+        questions: theme.questions.filter(function (_, i) {
+          return session.flipped[i];
+        }),
+        answers: session.answers.filter(function (_, i) {
+          return session.flipped[i];
+        }),
+        savedAt: nowIso(),
+      });
+      saveStore(state.store);
+      state.talkSession = null;
+      showToast('오늘의 한마디를 기록했어요!');
+      setScreen('main');
+    });
+  }
+
+  /* ---------------------------------------------------------------- */
   /* Screen: 자유게임                                                    */
   /* ---------------------------------------------------------------- */
 
@@ -1639,6 +1830,7 @@
         record.sessions = [];
         record.missionChecks = [];
         record.gameResults = [];
+        record.talkNotes = [];
         saveStore(state.store);
         showToast('체험기록을 삭제했어요.');
         setScreen('main');
@@ -1721,6 +1913,7 @@
     $('#homeBtn').addEventListener('click', function () {
       state.wizard = null;
       state.gameSession = null;
+      state.talkSession = null;
       setScreen(getCurrentRecord(state.store) ? 'main' : 'schoolSelect');
     });
     $('#changeSchoolBtn').addEventListener('click', function () {
@@ -1729,6 +1922,7 @@
       state.wizard = null;
       state.gameSession = null;
       state.todayMeal = null;
+      state.talkSession = null;
       setScreen('schoolSelect');
     });
 
@@ -1749,6 +1943,7 @@
     window.addEventListener('popstate', function (e) {
       state.wizard = null;
       state.gameSession = null;
+      state.talkSession = null;
       state.screen = (e.state && e.state.screen) || (getCurrentRecord(state.store) ? 'main' : 'schoolSelect');
       render();
     });

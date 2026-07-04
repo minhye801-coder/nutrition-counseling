@@ -529,6 +529,82 @@ input[type="range"] {
   margin: 0;
 }
 
+/* Tarot-style talk cards */
+.tarot-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1rem;
+}
+
+.tarot-card {
+  perspective: 1000px;
+  height: 220px;
+  cursor: pointer;
+}
+
+.tarot-card.flipped {
+  cursor: default;
+}
+
+.tarot-card-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transition: transform 0.6s;
+  transform-style: preserve-3d;
+}
+
+.tarot-card.flipped .tarot-card-inner {
+  transform: rotateY(180deg);
+}
+
+.tarot-card:not(.flipped):hover .tarot-card-inner {
+  transform: scale(1.04);
+}
+
+.tarot-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  border-radius: var(--radius-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  overflow: auto;
+}
+
+.tarot-back {
+  background: linear-gradient(135deg, var(--color-primary), #9c6bff);
+  color: #fff;
+  font-size: 2.8rem;
+  border: 2px solid var(--color-primary-dark);
+  box-shadow: var(--shadow-card);
+}
+
+.tarot-front {
+  background: var(--color-primary-light);
+  border: 2px solid var(--color-primary);
+  transform: rotateY(180deg);
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.tarot-question {
+  font-weight: 700;
+  text-align: center;
+  margin: 0;
+}
+
+.tarot-answer-input {
+  width: 100%;
+  padding: 0.5rem 0.7rem;
+  border-radius: var(--radius-sm);
+  border: 2px solid var(--color-border);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
 /* Game */
 .game-question {
   font-weight: 700;
