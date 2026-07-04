@@ -137,6 +137,64 @@
     },
   };
 
+  var GROWTH_STAGES = [
+    { icon: '🌰', label: '잠든 씨앗', caption: '아직 탐험을 시작하지 않았어요' },
+    { icon: '🌱', label: '새싹', caption: '새싹이 돋아났어요!' },
+    { icon: '🌿', label: '떡잎', caption: '잎이 무럭무럭 자라고 있어요' },
+    { icon: '🌳', label: '작은 나무', caption: '작은 나무가 되었어요' },
+    { icon: '🌸', label: '꽃봉오리', caption: '꽃을 활짝 피웠어요!' },
+    { icon: '🌈', label: '맛마음 나무', caption: '맛마음 나무가 멋지게 자랐어요!' },
+  ];
+
+  function growthStageFor(record) {
+    var count = Math.min(completedSessionCount(record), GROWTH_STAGES.length - 1);
+    return GROWTH_STAGES[count];
+  }
+
+  var CELEBRATION_STAMPS = [
+    { icon: '🌟', text: '최고예요!' },
+    { icon: '👏', text: '잘 해냈어요!' },
+    { icon: '💪', text: '용기가 자랐어요!' },
+    { icon: '🎉', text: '대단해요!' },
+    { icon: '✨', text: '오늘도 성장했어요!' },
+  ];
+
+  function showCelebration(callback) {
+    var stamp = CELEBRATION_STAMPS[Math.floor(Math.random() * CELEBRATION_STAMPS.length)];
+    var overlay = document.createElement('div');
+    overlay.className = 'celebration-overlay';
+    var confettiHtml = '';
+    for (var i = 0; i < 24; i++) {
+      var left = Math.random() * 100;
+      var delay = Math.random() * 0.4;
+      var duration = 1.2 + Math.random() * 0.8;
+      var hue = Math.floor(Math.random() * 360);
+      confettiHtml +=
+        '<span class="confetti-piece" style="left:' + left + '%; animation-delay:' + delay + 's; animation-duration:' + duration + 's; background:hsl(' + hue + ',80%,60%);"></span>';
+    }
+    overlay.innerHTML =
+      '<div class="confetti-layer">' + confettiHtml + '</div>' +
+      '<div class="celebration-stamp"><div class="celebration-icon">' + stamp.icon + '</div><div class="celebration-text">' + escapeHtml(stamp.text) + '</div></div>';
+    document.body.appendChild(overlay);
+    setTimeout(function () {
+      overlay.remove();
+      callback();
+    }, 1600);
+  }
+
+  var NEXT_ACTIVITY_SUGGESTIONS = [
+    { screen: 'explore', icon: '🧭', text: '오늘의 탐험을 시작해서 급식과 만나보세요!' },
+    { screen: 'talkCards', icon: '🔮', text: '오늘의 한마디로 대화를 나눠보세요' },
+    { screen: 'gamesList', icon: '🎮', text: '자유게임으로 재미있게 복습해봐요' },
+    { screen: 'missionReview', icon: '📝', text: '미션 돌아보기에서 지난 미션을 점검해봐요' },
+    { screen: 'notes', icon: '📓', text: '탐험노트에서 나의 성장을 확인해봐요' },
+  ];
+
+  function nextSuggestionFor(record) {
+    var count = completedSessionCount(record);
+    return NEXT_ACTIVITY_SUGGESTIONS[count % NEXT_ACTIVITY_SUGGESTIONS.length];
+  }
+
   var GAMES = [
     {
       id: 'sense',
@@ -952,12 +1010,24 @@
     var info = record.schoolInfo;
     var latest = record.sessions.length ? record.sessions[record.sessions.length - 1] : null;
     var gameCount = record.gameResults.length;
+    var growth = growthStageFor(record);
+    var suggestion = nextSuggestionFor(record);
+    var nextGrowth = GROWTH_STAGES[Math.min(completedSessionCount(record) + 1, GROWTH_STAGES.length - 1)];
+    var atMaxGrowth = completedSessionCount(record) >= GROWTH_STAGES.length - 1;
 
     app.innerHTML =
       '<div class="screen">' +
       '<h2 class="screen-title">' + escapeHtml(info.schoolName) + ' · ' + escapeHtml(record.nickname || '') + '</h2>' +
       '<p class="screen-subtitle">전국 학교급식 기반 식생활 탐험 웹앱</p>' +
       '<div class="card" id="mealCard"><p class="text-muted">오늘 급식을 불러오는 중이에요...</p></div>' +
+      '<div class="card growth-card">' +
+      '<div class="growth-icon">' + growth.icon + '</div>' +
+      '<div class="growth-info">' +
+      '<div class="growth-label">나의 맛마음 나무 · ' + escapeHtml(growth.label) + '</div>' +
+      '<div class="text-muted">' + escapeHtml(growth.caption) + '</div>' +
+      (atMaxGrowth ? '' : '<div class="text-muted growth-next">다음 단계(' + nextGrowth.icon + ' ' + escapeHtml(nextGrowth.label) + ')까지 한 회기 남았어요</div>') +
+      '</div>' +
+      '</div>' +
       '<div class="card">' +
       '<div class="card-grid">' +
       '<div class="stat-tile"><div class="stat-value">' + progressLabel(record) + '</div><div class="stat-label">핵심 탐험 진행</div></div>' +
@@ -968,6 +1038,10 @@
       (latest ? escapeHtml(latest.mission) : '아직 만든 미션이 없어요. 오늘의 탐험을 시작해 보세요!') +
       '</p>' +
       '</div>' +
+      '<button type="button" class="suggestion-banner" id="suggestionBanner" data-screen="' + suggestion.screen + '">' +
+      '<span class="suggestion-icon">' + suggestion.icon + '</span>' +
+      '<span>💡 다음엔 이건 어때요?<br />' + escapeHtml(suggestion.text) + '</span>' +
+      '</button>' +
       '<div class="menu-grid">' +
       MENU_ITEMS.map(function (m) {
         return (
@@ -980,6 +1054,10 @@
       }).join('') +
       '</div>' +
       '</div>';
+
+    $('#suggestionBanner').addEventListener('click', function () {
+      setScreen(suggestion.screen);
+    });
 
     $all('.menu-card[data-screen]', app).forEach(function (btn) {
       btn.addEventListener('click', function () {
@@ -1364,8 +1442,10 @@
       confidence: wizard.confidence,
     });
     state.wizard = null;
-    showToast(sessionNo + '회기 탐험을 저장했어요!');
-    setScreen('main');
+    showCelebration(function () {
+      showToast(sessionNo + '회기 탐험을 저장했어요!');
+      setScreen('main');
+    });
   }
 
   /* ---------------------------------------------------------------- */
@@ -1585,11 +1665,21 @@
   /* Screen: 자유게임                                                    */
   /* ---------------------------------------------------------------- */
 
+  var TIME_ATTACK_SECONDS = 10;
+
+  function clearGameTimer() {
+    if (state.timeAttackIntervalId) {
+      clearInterval(state.timeAttackIntervalId);
+      state.timeAttackIntervalId = null;
+    }
+  }
+
   function renderGamesList(app) {
     app.innerHTML =
       '<div class="screen">' +
       '<h2 class="screen-title">자유게임</h2>' +
       '<p class="screen-subtitle">재미있는 식생활 게임으로 탐험을 이어가요.</p>' +
+      '<label class="toggle-row"><input type="checkbox" id="timeAttackToggle"' + (state.timeAttackMode ? ' checked' : '') + ' /> ⏱️ 타임어택 모드 (문제당 ' + TIME_ATTACK_SECONDS + '초 제한)</label>' +
       '<div class="menu-grid">' +
       GAMES.map(function (g) {
         return (
@@ -1602,6 +1692,10 @@
       }).join('') +
       '</div></div>';
 
+    $('#timeAttackToggle').addEventListener('change', function (e) {
+      state.timeAttackMode = e.target.checked;
+    });
+
     $all('.menu-card[data-game]', app).forEach(function (btn) {
       btn.addEventListener('click', function () {
         startGame(btn.getAttribute('data-game'));
@@ -1610,11 +1704,25 @@
   }
 
   function startGame(gameId) {
-    state.gameSession = { gameId: gameId, qIndex: 0, score: 0, answered: false };
+    state.gameSession = { gameId: gameId, qIndex: 0, score: 0, answered: false, timeAttack: !!state.timeAttackMode };
     setScreen('gamePlay');
   }
 
+  function revealGameAnswer(session, question, chosenIdx) {
+    clearGameTimer();
+    session.answered = true;
+    if (chosenIdx === question.answer) session.score++;
+    $all('#gameOptions .game-option').forEach(function (b, i) {
+      b.disabled = true;
+      if (i === question.answer) b.classList.add('correct');
+      else if (i === chosenIdx) b.classList.add('wrong');
+    });
+    $('#gameExplain').innerHTML = '<div class="game-explain">' + escapeHtml(question.explain) + '</div>';
+    $('#gameNextWrap').hidden = false;
+  }
+
   function renderGamePlay(app) {
+    clearGameTimer();
     var session = state.gameSession;
     if (!session) {
       setScreen('gamesList');
@@ -1634,7 +1742,9 @@
     app.innerHTML =
       '<div class="screen">' +
       '<h2 class="screen-title">' + game.icon + ' ' + escapeHtml(game.name) + '</h2>' +
-      '<p class="screen-subtitle">문제 ' + (session.qIndex + 1) + ' / ' + game.questions.length + '</p>' +
+      '<p class="screen-subtitle">문제 ' + (session.qIndex + 1) + ' / ' + game.questions.length +
+      (session.timeAttack ? ' · <span class="timer-badge" id="timeAttackTimer">' + TIME_ATTACK_SECONDS + '초</span>' : '') +
+      '</p>' +
       '<div class="card">' +
       '<p class="game-question">' + escapeHtml(question.q) + '</p>' +
       '<div id="gameOptions">' + options + '</div>' +
@@ -1648,19 +1758,23 @@
     $all('#gameOptions .game-option').forEach(function (btn) {
       btn.addEventListener('click', function () {
         if (session.answered) return;
-        session.answered = true;
         var idx = Number(btn.getAttribute('data-idx'));
-        var correct = idx === question.answer;
-        if (correct) session.score++;
-        $all('#gameOptions .game-option').forEach(function (b, i) {
-          b.disabled = true;
-          if (i === question.answer) b.classList.add('correct');
-          else if (i === idx) b.classList.add('wrong');
-        });
-        $('#gameExplain').innerHTML = '<div class="game-explain">' + escapeHtml(question.explain) + '</div>';
-        $('#gameNextWrap').hidden = false;
+        revealGameAnswer(session, question, idx);
       });
     });
+
+    if (session.timeAttack) {
+      var timeLeft = TIME_ATTACK_SECONDS;
+      var timerEl = $('#timeAttackTimer');
+      state.timeAttackIntervalId = setInterval(function () {
+        timeLeft--;
+        if (timerEl) timerEl.textContent = timeLeft + '초';
+        if (timeLeft <= 0) {
+          clearGameTimer();
+          if (!session.answered) revealGameAnswer(session, question, -1);
+        }
+      }, 1000);
+    }
 
     $('#gameNextBtn').addEventListener('click', function () {
       if (session.qIndex < game.questions.length - 1) {
@@ -1673,6 +1787,7 @@
           gameName: game.name,
           score: session.score,
           total: game.questions.length,
+          mode: session.timeAttack ? 'timeAttack' : 'normal',
         });
         setScreen('gameResult');
       }
@@ -1693,7 +1808,7 @@
       '<div class="screen">' +
       '<h2 class="screen-title">게임 결과</h2>' +
       '<div class="card text-center">' +
-      '<p class="game-question">' + game.icon + ' ' + escapeHtml(game.name) + '</p>' +
+      '<p class="game-question">' + game.icon + ' ' + escapeHtml(game.name) + (session.timeAttack ? ' <span class="timer-badge">⏱️ 타임어택</span>' : '') + '</p>' +
       '<div class="stat-tile"><div class="stat-value">' + session.score + ' / ' + game.questions.length + '</div>' +
       '<div class="stat-label">맞힌 문제 수</div></div>' +
       '<div class="wizard-actions mt-1">' +
@@ -1964,12 +2079,14 @@
       window.history.back();
     });
     $('#homeBtn').addEventListener('click', function () {
+      clearGameTimer();
       state.wizard = null;
       state.gameSession = null;
       state.talkSession = null;
       setScreen(getCurrentRecord(state.store) ? 'main' : 'schoolSelect');
     });
     $('#changeSchoolBtn').addEventListener('click', function () {
+      clearGameTimer();
       state.store.currentSchoolKey = null;
       saveStore(state.store);
       state.wizard = null;
@@ -1994,6 +2111,7 @@
     render();
 
     window.addEventListener('popstate', function (e) {
+      clearGameTimer();
       state.wizard = null;
       state.gameSession = null;
       state.talkSession = null;
