@@ -2009,6 +2009,44 @@
     });
   }
 
+  var BREAKOUT_FOODS = [
+    { name: '당근', group: 'veg' },
+    { name: '감자', group: 'veg' },
+    { name: '양파', group: 'veg' },
+    { name: '오이', group: 'veg' },
+    { name: '가지', group: 'veg' },
+    { name: '호박', group: 'veg' },
+    { name: '버섯', group: 'veg' },
+    { name: '무', group: 'veg' },
+    { name: '배추', group: 'veg' },
+    { name: '콩나물', group: 'veg' },
+    { name: '시금치', group: 'veg' },
+    { name: '고구마', group: 'veg' },
+    { name: '사과', group: 'fruit' },
+    { name: '바나나', group: 'fruit' },
+    { name: '딸기', group: 'fruit' },
+    { name: '포도', group: 'fruit' },
+    { name: '수박', group: 'fruit' },
+    { name: '참외', group: 'fruit' },
+    { name: '배', group: 'fruit' },
+    { name: '귤', group: 'fruit' },
+    { name: '복숭아', group: 'fruit' },
+    { name: '자두', group: 'fruit' },
+    { name: '키위', group: 'fruit' },
+    { name: '망고', group: 'fruit' },
+  ];
+
+  function shuffleArray(arr) {
+    var a = arr.slice();
+    for (var i = a.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var tmp = a[i];
+      a[i] = a[j];
+      a[j] = tmp;
+    }
+    return a;
+  }
+
   function canvasScreenMarkup(game, statusText) {
     return (
       '<div class="screen">' +
@@ -2040,23 +2078,30 @@
     var dx = 2.2;
     var dy = -2.8;
 
-    var rowCount = 4;
-    var colCount = 6;
-    var brickWidth = 40;
-    var brickHeight = 16;
+    var colCount = 4;
+    var rowCount = Math.ceil(BREAKOUT_FOODS.length / colCount);
+    var brickWidth = 64;
+    var brickHeight = 20;
     var brickPadding = 6;
-    var brickOffsetTop = 30;
+    var brickOffsetTop = 26;
     var brickOffsetLeft = (width - (colCount * (brickWidth + brickPadding) - brickPadding)) / 2;
 
+    var shuffledFoods = shuffleArray(BREAKOUT_FOODS);
     var bricks = [];
+    var foodIdx = 0;
     for (var c = 0; c < colCount; c++) {
       bricks[c] = [];
       for (var r = 0; r < rowCount; r++) {
-        bricks[c][r] = { alive: true };
+        if (foodIdx < shuffledFoods.length) {
+          bricks[c][r] = { alive: true, food: shuffledFoods[foodIdx] };
+          foodIdx++;
+        } else {
+          bricks[c][r] = { alive: false, food: null };
+        }
       }
     }
 
-    var totalBricks = rowCount * colCount;
+    var totalBricks = shuffledFoods.length;
     var brokenCount = 0;
     var ended = false;
 
@@ -2083,8 +2128,13 @@
           if (!b.alive) continue;
           var bx = brickOffsetLeft + c * (brickWidth + brickPadding);
           var by = brickOffsetTop + r * (brickHeight + brickPadding);
-          ctx.fillStyle = '#7c4dff';
+          ctx.fillStyle = b.food.group === 'veg' ? '#22b573' : '#e2971f';
           ctx.fillRect(bx, by, brickWidth, brickHeight);
+          ctx.fillStyle = '#ffffff';
+          ctx.font = 'bold 11px "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(b.food.name, bx + brickWidth / 2, by + brickHeight / 2 + 1);
         }
       }
     }
