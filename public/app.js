@@ -593,6 +593,7 @@
 
   function setScreen(name) {
     state.screen = name;
+    window.history.pushState({ screen: name }, '', window.location.pathname);
     render();
     window.scrollTo(0, 0);
   }
@@ -899,9 +900,13 @@
 
   function ensureWizard() {
     if (!state.wizard) {
+      var today = new Date().toISOString().slice(0, 10);
       state.wizard = {
         step: 1,
-        date: new Date().toISOString().slice(0, 10),
+        date: today,
+        mealDate: today,
+        mealData: state.todayMeal || null,
+        mealError: null,
         food: '',
         feeling: '',
         story: '',
@@ -912,6 +917,45 @@
       };
     }
     return state.wizard;
+  }
+
+  function addDaysToDateString(dateStr, days) {
+    var d = new Date(dateStr + 'T00:00:00');
+    d.setDate(d.getDate() + days);
+    var y = d.getFullYear();
+    var m = String(d.getMonth() + 1).padStart(2, '0');
+    var day = String(d.getDate()).padStart(2, '0');
+    return y + '-' + m + '-' + day;
+  }
+
+  function formatMealDateLabel(wizard) {
+    if (wizard.mealDate === wizard.date) return '오늘';
+    if (wizard.mealDate === addDaysToDateString(wizard.date, 1)) return '내일';
+    return wizard.mealDate;
+  }
+
+  async function changeWizardMealDate(wizard, dateStr) {
+    var record = getCurrentRecord(state.store);
+    if (!record) return;
+    wizard.mealDate = dateStr;
+    wizard.food = '';
+    wizard.mealData = null;
+    wizard.mealError = null;
+    render();
+    try {
+      var data = await apiGet('/api/meals', {
+        officeCode: record.schoolInfo.officeCode,
+        schoolCode: record.schoolInfo.schoolCode,
+        schoolName: record.schoolInfo.schoolName,
+        date: dateStr.replace(/-/g, ''),
+      });
+      if (!state.wizard || state.wizard.mealDate !== dateStr) return;
+      wizard.mealData = data;
+    } catch (err) {
+      if (!state.wizard || state.wizard.mealDate !== dateStr) return;
+      wizard.mealError = err.message;
+    }
+    render();
   }
 
   function renderExplore(app) {
@@ -943,9 +987,19 @@
   }
 
   function renderExploreStep1(wizard) {
-    var meal = state.todayMeal;
-    var foodChoices = '';
-    if (meal && meal.hasMeal && meal.menu.length) {
+    var meal = wizard.mealData;
+    var isToday = wizard.mealDate === wizard.date;
+    var isTomorrow = wizard.mealDate === addDaysToDateString(wizard.date, 1);
+
+    var customFoodInputHtml =
+      '<div class="field"><input type="text" id="customFoodInput" placeholder="예: 당근" value="' + escapeHtml(wizard.food) + '" /></div>';
+
+    var foodChoices;
+    if (wizard.mealError) {
+      foodChoices = '<div class="banner banner-error">급식 정보를 불러오지 못했어요: ' + escapeHtml(wizard.mealError) + '</div>' + customFoodInputHtml;
+    } else if (!meal) {
+      foodChoices = '<p class="text-muted">급식 정보를 불러오는 중이에요...</p>';
+    } else if (meal.hasMeal && meal.menu.length) {
       foodChoices = meal.menu
         .map(function (m) {
           return (
@@ -958,11 +1012,7 @@
         })
         .join('');
     } else {
-      foodChoices =
-        '<p class="banner banner-info">오늘 등록된 급식이 없어 직접 입력해요.</p>' +
-        '<div class="field"><input type="text" id="customFoodInput" placeholder="예: 당근" value="' +
-        escapeHtml(wizard.food) +
-        '" /></div>';
+      foodChoices = '<p class="banner banner-info">그 날 등록된 급식이 없어 직접 입력해요.</p>' + customFoodInputHtml;
     }
 
     var feelingChoices = FEELINGS.map(function (f) {
@@ -977,7 +1027,13 @@
 
     return (
       '<h3>1단계. 느낌 찾기</h3>' +
-      '<p class="text-muted">오늘 급식 메뉴 중 가장 기억나는 음식을 골라 보세요.</p>' +
+      '<p class="text-muted">살펴볼 급식 날짜를 골라보세요.</p>' +
+      '<div class="flex-row">' +
+      '<button type="button" class="btn btn-sm' + (isToday ? '' : ' btn-outline') + '" id="mealDateTodayBtn">오늘 급식</button>' +
+      '<button type="button" class="btn btn-sm' + (isTomorrow ? '' : ' btn-outline') + '" id="mealDateTomorrowBtn">내일 급식</button>' +
+      '<input type="date" id="mealDateCustomInput" class="date-input" value="' + escapeHtml(wizard.mealDate) + '" />' +
+      '</div>' +
+      '<p class="text-muted mt-1">' + escapeHtml(formatMealDateLabel(wizard)) + ' 급식 메뉴 중 가장 기억나는 음식을 골라 보세요.</p>' +
       '<div class="choice-list" id="foodChoices">' + foodChoices + '</div>' +
       '<h3 class="mt-1">그때 느낌은 어땠나요?</h3>' +
       '<div class="choice-list" id="feelingChoices">' + feelingChoices + '</div>' +
@@ -1068,6 +1124,16 @@
       var storyInput = $('#storyInput');
       storyInput.addEventListener('input', function () {
         wizard.story = storyInput.value;
+      });
+      var tomorrow = addDaysToDateString(wizard.date, 1);
+      $('#mealDateTodayBtn').addEventListener('click', function () {
+        if (wizard.mealDate !== wizard.date) changeWizardMealDate(wizard, wizard.date);
+      });
+      $('#mealDateTomorrowBtn').addEventListener('click', function () {
+        if (wizard.mealDate !== tomorrow) changeWizardMealDate(wizard, tomorrow);
+      });
+      $('#mealDateCustomInput').addEventListener('change', function (e) {
+        if (e.target.value && e.target.value !== wizard.mealDate) changeWizardMealDate(wizard, e.target.value);
       });
       $('#step1NextBtn').addEventListener('click', function () {
         if (!wizard.food) {
@@ -1606,7 +1672,17 @@
     }
 
     var record = getCurrentRecord(state.store);
-    setScreen(record ? 'main' : 'schoolSelect');
+    var initialScreen = record ? 'main' : 'schoolSelect';
+    state.screen = initialScreen;
+    window.history.replaceState({ screen: initialScreen }, '', window.location.pathname);
+    render();
+
+    window.addEventListener('popstate', function (e) {
+      state.wizard = null;
+      state.gameSession = null;
+      state.screen = (e.state && e.state.screen) || (getCurrentRecord(state.store) ? 'main' : 'schoolSelect');
+      render();
+    });
   }
 
   document.addEventListener('DOMContentLoaded', init);

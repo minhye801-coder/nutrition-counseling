@@ -278,9 +278,6 @@ a {
   display: block;
   font-size: 0.85rem;
   color: var(--color-text-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 /* Choice list (feelings / difficulties / strategies) */
@@ -320,6 +317,7 @@ label {
 
 input[type="text"],
 input[type="search"],
+input[type="date"],
 textarea,
 select {
   width: 100%;
@@ -328,6 +326,11 @@ select {
   border: 2px solid var(--color-border);
   background: #fff;
   color: var(--color-text);
+}
+
+.date-input {
+  width: auto;
+  max-width: 200px;
 }
 
 textarea {
