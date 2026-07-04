@@ -549,6 +549,10 @@ input[type="range"] {
   z-index: 100;
 }
 
+.loading-overlay[hidden] {
+  display: none;
+}
+
 .loading-spinner {
   width: 46px;
   height: 46px;
