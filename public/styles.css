@@ -11,6 +11,8 @@
   --color-border: #e3ddf7;
   --color-danger: #d64545;
   --color-danger-light: #fdecec;
+  --color-food: #e2971f;
+  --color-food-light: #fff3de;
   --radius-lg: 20px;
   --radius-md: 14px;
   --radius-sm: 10px;
@@ -292,29 +294,79 @@ a {
 /* Choice list (feelings / difficulties / strategies) */
 .choice-list {
   display: grid;
-  gap: 0.6rem;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.7rem;
 }
 
 .choice-item {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   width: 100%;
   text-align: left;
   padding: 0.85rem 1rem;
-  border-radius: var(--radius-md);
+  border-radius: 999px;
   border: 2px solid var(--color-border);
   background: #fff;
   cursor: pointer;
-  font-weight: 600;
+  font-weight: 700;
+  transition: transform 0.08s ease, border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.choice-item:hover {
+  border-color: var(--color-primary);
+}
+
+.choice-item:active {
+  transform: scale(0.96);
+}
+
+.choice-item .choice-icon {
+  font-size: 1.25rem;
+  line-height: 1;
+  flex: none;
+}
+
+.choice-item .choice-text {
+  flex: 1;
 }
 
 .choice-item[aria-pressed="true"] {
   border-color: var(--color-primary);
   background: var(--color-primary-light);
+  box-shadow: 0 3px 10px rgba(124, 77, 255, 0.25);
 }
 
-.choice-item[aria-pressed="true"]::before {
-  content: "✔ ";
+.choice-item[aria-pressed="true"]::after {
+  content: "✔";
   color: var(--color-primary-dark);
+  font-weight: 800;
+  flex: none;
+}
+
+.choice-item-food {
+  border-color: #f3d7a1;
+  background: var(--color-food-light);
+}
+
+.choice-item-food:hover {
+  border-color: var(--color-food);
+}
+
+.choice-item-food[aria-pressed="true"] {
+  border-color: var(--color-food);
+  background: #ffe6b3;
+  box-shadow: 0 3px 10px rgba(226, 151, 31, 0.3);
+}
+
+.choice-item-food[aria-pressed="true"]::after {
+  color: #a25d00;
+}
+
+.section-divider {
+  border: none;
+  border-top: 2px dashed var(--color-border);
+  margin: 1.6rem 0;
 }
 
 /* Form elements */

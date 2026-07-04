@@ -52,6 +52,33 @@
     '다음 기회에 다시 만나 보기',
   ];
 
+  var FEELING_ICONS = {
+    '맛있고 편안했어요': '😋',
+    '조금 낯설었어요': '😯',
+    '냄새가 어려웠어요': '👃',
+    '식감이 어려웠어요': '😖',
+    '생각보다 괜찮았어요': '🙂',
+    '아직 잘 모르겠어요': '🤔',
+  };
+
+  var DIFFICULTY_ICONS = {
+    '냄새가 강했어요': '👃',
+    '식감이 낯설었어요': '😬',
+    '모양이나 색이 싫었어요': '👀',
+    '맛이 걱정됐어요': '😟',
+    '배가 고프지 않았어요': '🍽️',
+    '먹는 시간이 부족했어요': '⏰',
+  };
+
+  var STRATEGY_ICONS = {
+    '아주 작은 한입으로 맛보기': '🥄',
+    '먼저 냄새와 모양 살펴보기': '👀',
+    '좋아하는 음식과 함께 먹기': '🍚',
+    '천천히 오래 씹어 보기': '😌',
+    '친구나 선생님에게 도움받기': '🤝',
+    '다음 기회에 다시 만나 보기': '🔜',
+  };
+
   var BADGES = [
     { id: 'b1_1', session: 1, icon: '🍽️', name: '급식 관찰가', desc: '1회기 탐험을 완료하고 급식을 자세히 관찰했어요.' },
     { id: 'b1_2', session: 1, icon: '🗣️', name: '마음 표현가', desc: '1회기 탐험에서 내 느낌을 솔직하게 표현했어요.' },
@@ -988,6 +1015,27 @@
     wireExploreStep(wizard);
   }
 
+  function foodEmoji(name) {
+    var rules = [
+      [/우유|요구르트/, '🥛'],
+      [/사과|배|귤|딸기|포도|자두|바나나|수박|참외|복숭아|하우스귤/, '🍎'],
+      [/김치/, '🥬'],
+      [/치킨|닭/, '🍗'],
+      [/고기|불고기|장조림|탕수육|갈비|곰탕/, '🥩'],
+      [/생선|고등어|갈치|삼치|동태|명태|맛탕/, '🐟'],
+      [/계란|달걀/, '🥚'],
+      [/샐러드|무침|나물|생채/, '🥗'],
+      [/면|국수|파스타|스파게티/, '🍜'],
+      [/빵|토스트/, '🍞'],
+      [/국$|탕$|찌개$/, '🍲'],
+      [/밥$/, '🍚'],
+    ];
+    for (var i = 0; i < rules.length; i++) {
+      if (rules[i][0].test(name)) return rules[i][1];
+    }
+    return '🍽️';
+  }
+
   function renderExploreStep1(wizard) {
     var meal = wizard.mealData;
     var isToday = wizard.mealDate === wizard.date;
@@ -1005,10 +1053,11 @@
       foodChoices = meal.menu
         .map(function (m) {
           return (
-            '<button type="button" class="choice-item" data-group="food" data-value="' +
+            '<button type="button" class="choice-item choice-item-food" data-group="food" data-value="' +
             escapeHtml(m) +
             '" aria-pressed="' + (wizard.food === m ? 'true' : 'false') + '">' +
-            escapeHtml(m) +
+            '<span class="choice-icon">' + foodEmoji(m) + '</span>' +
+            '<span class="choice-text">' + escapeHtml(m) + '</span>' +
             '</button>'
           );
         })
@@ -1022,7 +1071,8 @@
         '<button type="button" class="choice-item" data-group="feeling" data-value="' +
         escapeHtml(f) +
         '" aria-pressed="' + (wizard.feeling === f ? 'true' : 'false') + '">' +
-        escapeHtml(f) +
+        '<span class="choice-icon">' + (FEELING_ICONS[f] || '') + '</span>' +
+        '<span class="choice-text">' + escapeHtml(f) + '</span>' +
         '</button>'
       );
     }).join('');
@@ -1037,7 +1087,8 @@
       '</div>' +
       '<p class="text-muted mt-1">' + escapeHtml(formatMealDateLabel(wizard)) + ' 급식 메뉴 중 가장 기억나는 음식을 골라 보세요.</p>' +
       '<div class="choice-list" id="foodChoices">' + foodChoices + '</div>' +
-      '<h3 class="mt-1">그때 느낌은 어땠나요?</h3>' +
+      '<hr class="section-divider" />' +
+      '<h3>그때 느낌은 어땠나요?</h3>' +
       '<div class="choice-list" id="feelingChoices">' + feelingChoices + '</div>' +
       '<div class="field mt-1"><label for="storyInput">한 줄로 이야기해 볼까요? (선택)</label>' +
       '<input type="text" id="storyInput" maxlength="80" value="' + escapeHtml(wizard.story) + '" placeholder="예: 당근 냄새가 낯설었지만 한입 먹어봤어요" /></div>' +
@@ -1051,7 +1102,8 @@
         '<button type="button" class="choice-item" data-group="difficulty" data-value="' +
         escapeHtml(d) +
         '" aria-pressed="' + (wizard.difficulty === d ? 'true' : 'false') + '">' +
-        escapeHtml(d) +
+        '<span class="choice-icon">' + (DIFFICULTY_ICONS[d] || '') + '</span>' +
+        '<span class="choice-text">' + escapeHtml(d) + '</span>' +
         '</button>'
       );
     }).join('');
@@ -1060,7 +1112,8 @@
         '<button type="button" class="choice-item" data-group="strategy" data-value="' +
         escapeHtml(s) +
         '" aria-pressed="' + (wizard.strategy === s ? 'true' : 'false') + '">' +
-        escapeHtml(s) +
+        '<span class="choice-icon">' + (STRATEGY_ICONS[s] || '') + '</span>' +
+        '<span class="choice-text">' + escapeHtml(s) + '</span>' +
         '</button>'
       );
     }).join('');
@@ -1069,7 +1122,8 @@
       '<h3>2단계. 어려움과 전략</h3>' +
       '<p class="text-muted">무엇이 어려웠나요? (선택하지 않아도 괜찮아요)</p>' +
       '<div class="choice-list" id="difficultyChoices">' + difficultyChoices + '</div>' +
-      '<h3 class="mt-1">어떤 전략을 써볼까요?</h3>' +
+      '<hr class="section-divider" />' +
+      '<h3>어떤 전략을 써볼까요?</h3>' +
       '<div class="choice-list" id="strategyChoices">' + strategyChoices + '</div>' +
       '<div class="wizard-actions">' +
       '<button type="button" class="btn btn-outline" id="step2PrevBtn">이전</button>' +
