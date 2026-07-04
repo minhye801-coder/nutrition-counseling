@@ -232,6 +232,123 @@
     return word + (hasBatchim ? '을' : '를');
   }
 
+  var BACKUP_GAME_CAP = 10;
+
+  function utf8ToBase64Url(str) {
+    var bytes = new TextEncoder().encode(str);
+    var binary = '';
+    bytes.forEach(function (b) {
+      binary += String.fromCharCode(b);
+    });
+    return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+
+  function base64UrlToUtf8(b64url) {
+    var b64 = b64url.replace(/-/g, '+').replace(/_/g, '/');
+    while (b64.length % 4) b64 += '=';
+    var binary = atob(b64);
+    var bytes = new Uint8Array(binary.length);
+    for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return new TextDecoder().decode(bytes);
+  }
+
+  function buildBackupCode(record) {
+    var compact = {
+      v: 1,
+      sc: [record.schoolInfo.officeCode, record.schoolInfo.schoolCode, record.schoolInfo.schoolName, record.schoolInfo.schoolKind],
+      s: record.sessions.map(function (s) {
+        return [s.sessionNo, s.date, s.food, s.feeling, s.story || '', s.difficulty || '', s.strategy || '', s.mission, s.confidence];
+      }),
+      mc: record.missionChecks.map(function (c) {
+        return [c.sessionNo, c.date, c.status, c.note || ''];
+      }),
+      gr: record.gameResults.slice(-BACKUP_GAME_CAP).map(function (g) {
+        return [g.game, g.score, g.total, (g.playedAt || '').slice(0, 10)];
+      }),
+    };
+    return utf8ToBase64Url(JSON.stringify(compact));
+  }
+
+  function parseBackupCode(code) {
+    var compact = JSON.parse(base64UrlToUtf8(code));
+    if (!compact || compact.v !== 1 || !compact.sc) throw new Error('올바르지 않은 코드입니다.');
+    var office = OFFICES.filter(function (o) {
+      return o.code === compact.sc[0];
+    })[0];
+    var schoolInfo = {
+      officeCode: compact.sc[0],
+      officeName: office ? office.name : '',
+      schoolCode: compact.sc[1],
+      schoolName: compact.sc[2],
+      schoolKind: compact.sc[3],
+      address: '',
+    };
+    var sessions = (compact.s || []).map(function (a) {
+      return {
+        sessionNo: a[0],
+        date: a[1],
+        food: a[2],
+        feeling: a[3],
+        story: a[4],
+        difficulty: a[5],
+        strategy: a[6],
+        mission: a[7],
+        confidence: a[8],
+        savedAt: a[1] + 'T00:00:00.000Z',
+      };
+    });
+    var missionChecks = (compact.mc || []).map(function (a) {
+      return { sessionNo: a[0], date: a[1], status: a[2], note: a[3], checkedAt: a[1] + 'T00:00:00.000Z' };
+    });
+    var gameResults = (compact.gr || []).map(function (a) {
+      var game = GAMES.filter(function (g) {
+        return g.id === a[0];
+      })[0];
+      return { game: a[0], gameName: game ? game.name : a[0], score: a[1], total: a[2], playedAt: a[3] + 'T00:00:00.000Z' };
+    });
+    return { schoolInfo: schoolInfo, sessions: sessions, missionChecks: missionChecks, gameResults: gameResults };
+  }
+
+  function applyRestoreCode(code) {
+    var decoded;
+    try {
+      decoded = parseBackupCode(code);
+    } catch (err) {
+      showToast('코드를 불러오지 못했어요. 코드가 올바른지 확인해 주세요.');
+      return false;
+    }
+    var key = schoolKeyOf(decoded.schoolInfo);
+    var existing = state.store.schools[key];
+    if (existing && (existing.sessions.length || existing.missionChecks.length || existing.gameResults.length)) {
+      if (!window.confirm(decoded.schoolInfo.schoolName + '의 기존 기록을 이 코드의 기록으로 덮어쓸까요? 이 작업은 되돌릴 수 없어요.')) {
+        return false;
+      }
+    }
+    state.store.schools[key] = {
+      schoolInfo: decoded.schoolInfo,
+      sessions: decoded.sessions,
+      missionChecks: decoded.missionChecks,
+      gameResults: decoded.gameResults,
+    };
+    state.store.currentSchoolKey = key;
+    saveStore(state.store);
+    showToast(decoded.schoolInfo.schoolName + '의 기록을 불러왔어요!');
+    return true;
+  }
+
+  function extractRestoreCode(raw) {
+    var qIndex = raw.indexOf('?r=');
+    if (qIndex >= 0) return raw.slice(qIndex + 3).split('&')[0];
+    try {
+      var url = new URL(raw);
+      var param = url.searchParams.get('r');
+      if (param) return param;
+    } catch (err) {
+      // not a URL; treat raw input as the code itself
+    }
+    return raw;
+  }
+
   async function apiGet(path, params) {
     var url = new URL(path, window.location.origin);
     Object.keys(params || {}).forEach(function (k) {
@@ -1230,9 +1347,21 @@
       '<li>이메일이나 회원가입 정보를 받지 않아요.</li>' +
       '<li>서버나 데이터베이스에 탐험기록을 저장하지 않아요.</li>' +
       '<li>기록은 지금 사용 중인 브라우저의 localStorage에만 저장돼요.</li>' +
-      '<li>브라우저나 기기를 바꾸면 기록이 이어지지 않아요.</li>' +
+      '<li>브라우저나 기기를 바꾸면 기록이 이어지지 않아요. (아래 백업 큐알을 쓰면 이어갈 수 있어요)</li>' +
       '<li>시크릿(비공개) 모드는 창을 닫으면 기록이 사라질 수 있어요.</li>' +
       '</ul>' +
+      '</div>' +
+      '<div class="card">' +
+      '<h3>내 기록 백업 큐알</h3>' +
+      '<p class="text-muted">지금까지의 탐험 기록을 큐알이나 주소로 만들어두면, 다른 기기나 브라우저에서도 이어갈 수 있어요. 이 큐알 안에 기록이 그대로 담기는 방식이라 서버에는 여전히 아무것도 저장되지 않아요. 큐알이나 주소를 잃어버리면 그 기록도 함께 사라지니 잘 보관해 주세요.</p>' +
+      '<button type="button" class="btn btn-secondary" id="makeBackupBtn"' + (record ? '' : ' disabled') + '>백업 큐알 만들기</button>' +
+      '<div id="backupOutput" class="mt-1"></div>' +
+      '</div>' +
+      '<div class="card">' +
+      '<h3>코드로 기록 불러오기</h3>' +
+      '<p class="text-muted">받은 백업 코드나 주소를 붙여넣으면 그 기록을 불러와요. 해당 학교의 기존 기록이 있다면 덮어씁니다.</p>' +
+      '<div class="field"><textarea id="restoreCodeInput" placeholder="백업 코드 또는 주소를 붙여넣으세요"></textarea></div>' +
+      '<button type="button" class="btn btn-outline" id="restoreCodeBtn">코드 불러오기</button>' +
       '</div>' +
       '<div class="card">' +
       '<h3>현재 학교 체험기록 삭제</h3>' +
@@ -1251,6 +1380,62 @@
         saveStore(state.store);
         showToast('체험기록을 삭제했어요.');
         setScreen('main');
+      });
+    }
+
+    var makeBackupBtn = $('#makeBackupBtn');
+    if (makeBackupBtn && record) {
+      makeBackupBtn.addEventListener('click', function () {
+        try {
+          var code = buildBackupCode(record);
+          var url = window.location.origin + window.location.pathname + '?r=' + code;
+          var qr = qrcode(0, 'M');
+          qr.addData(url);
+          qr.make();
+          $('#backupOutput').innerHTML =
+            '<div class="qr-wrap">' + qr.createSvgTag(4, 8) + '</div>' +
+            '<div class="field mt-1"><label for="backupUrlOutput">백업 주소</label>' +
+            '<input type="text" id="backupUrlOutput" readonly value="' + escapeHtml(url) + '" /></div>' +
+            '<button type="button" class="btn btn-sm btn-outline" id="copyBackupUrlBtn">주소 복사하기</button>';
+          var copyBtn = $('#copyBackupUrlBtn');
+          copyBtn.addEventListener('click', function () {
+            var input = $('#backupUrlOutput');
+            input.select();
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+              navigator.clipboard
+                .writeText(url)
+                .then(function () {
+                  showToast('주소를 복사했어요!');
+                })
+                .catch(function () {
+                  showToast('복사에 실패했어요. 직접 선택해 복사해 주세요.');
+                });
+            } else {
+              try {
+                document.execCommand('copy');
+                showToast('주소를 복사했어요!');
+              } catch (err) {
+                showToast('복사에 실패했어요. 직접 선택해 복사해 주세요.');
+              }
+            }
+          });
+        } catch (err) {
+          showToast('백업 큐알을 만들지 못했어요. 게임기록이 많다면 조금 줄여보세요.');
+        }
+      });
+    }
+
+    var restoreBtn = $('#restoreCodeBtn');
+    if (restoreBtn) {
+      restoreBtn.addEventListener('click', function () {
+        var raw = $('#restoreCodeInput').value.trim();
+        if (!raw) {
+          showToast('코드나 주소를 입력해 주세요.');
+          return;
+        }
+        if (applyRestoreCode(extractRestoreCode(raw))) {
+          setScreen('main');
+        }
       });
     }
   }
@@ -1282,6 +1467,12 @@
     });
 
     loadConfig();
+
+    var restoreCode = new URLSearchParams(window.location.search).get('r');
+    if (restoreCode) {
+      applyRestoreCode(restoreCode);
+      window.history.replaceState({}, '', window.location.origin + window.location.pathname);
+    }
 
     var record = getCurrentRecord(state.store);
     setScreen(record ? 'main' : 'schoolSelect');
