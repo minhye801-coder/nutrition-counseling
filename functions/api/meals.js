@@ -11,7 +11,7 @@ import {
 } from '../_lib/neis.js';
 
 const SEARCH_FORWARD_DAYS = 14;
-const CACHE_SECONDS = 6 * 60 * 60;
+const CACHE_SECONDS = 60 * 60;
 
 function pickPreferredMeal(rows) {
   if (!rows || !rows.length) return null;
@@ -42,7 +42,15 @@ export async function onRequestGet(context) {
 
   const cache = caches.default;
   const cacheUrl = new URL(request.url);
-  cacheUrl.search = new URLSearchParams({ officeCode, schoolCode, date }).toString();
+  // Include the deployed commit so a new deploy naturally invalidates any
+  // edge-cached responses from before a bug fix, instead of waiting out
+  // CACHE_SECONDS across every Cloudflare edge location.
+  cacheUrl.search = new URLSearchParams({
+    officeCode,
+    schoolCode,
+    date,
+    v: env.CF_PAGES_COMMIT_SHA || 'dev',
+  }).toString();
   const cacheKey = new Request(cacheUrl.toString(), { method: 'GET' });
 
   const cached = await cache.match(cacheKey);

@@ -21,7 +21,12 @@ export async function onRequestGet(context) {
 
   const cache = caches.default;
   const cacheUrl = new URL(request.url);
-  cacheUrl.search = new URLSearchParams({ query, officeCode, schoolKind }).toString();
+  cacheUrl.search = new URLSearchParams({
+    query,
+    officeCode,
+    schoolKind,
+    v: env.CF_PAGES_COMMIT_SHA || 'dev',
+  }).toString();
   const cacheKey = new Request(cacheUrl.toString(), { method: 'GET' });
 
   const cached = await cache.match(cacheKey);
