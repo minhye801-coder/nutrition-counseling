@@ -153,11 +153,11 @@
   // grows warmer and more expressive as the student's exploration continues.
   var GROWTH_STAGES = [
     { icon: '🥔', label: '낯선 감자', caption: '아직 탐험을 시작하지 않았어요' },
-    { icon: '🥔🌱', label: '새싹 난 공감자', caption: '작은 새싹이 돋아났어요!' },
-    { icon: '🥔✨', label: '반짝이는 공감자', caption: '조금씩 반짝이기 시작했어요' },
-    { icon: '🥔💪', label: '씩씩한 공감자', caption: '씩씩하게 자라고 있어요' },
-    { icon: '🥔🌟', label: '빛나는 공감자', caption: '눈부시게 빛나고 있어요!' },
-    { icon: '🥔👑', label: '완전체 공감자', caption: '멋진 공감자로 완전히 자랐어요!' },
+    { icon: '🥔🌱', label: '새싹 난 감자', caption: '작은 새싹이 돋아났어요!' },
+    { icon: '🥔✨', label: '반짝이는 감자', caption: '조금씩 반짝이기 시작했어요' },
+    { icon: '🥔💪', label: '씩씩한 감자', caption: '씩씩하게 자라고 있어요' },
+    { icon: '🥔🌟', label: '빛나는 감자', caption: '눈부시게 빛나고 있어요!' },
+    { icon: '🥔👑', label: '완전체 감자', caption: '멋진 감자로 완전히 자랐어요!' },
   ];
 
   function growthStageFor(record) {
@@ -212,6 +212,7 @@
   var GAMES = [
     {
       id: 'sense',
+      type: 'quiz',
       name: '음식 감각 탐정',
       icon: '🕵️',
       desc: '오감으로 음식을 탐정처럼 살펴봐요',
@@ -238,6 +239,7 @@
     },
     {
       id: 'tray',
+      type: 'quiz',
       name: '식판 친구 찾기',
       icon: '🍱',
       desc: '균형 잡힌 식판을 함께 알아봐요',
@@ -264,6 +266,7 @@
     },
     {
       id: 'rhythm',
+      type: 'quiz',
       name: '생활리듬 퀘스트',
       icon: '⏰',
       desc: '규칙적인 식사와 생활 리듬을 알아봐요',
@@ -290,6 +293,7 @@
     },
     {
       id: 'safety',
+      type: 'quiz',
       name: '음식 안전 신호',
       icon: '🛡️',
       desc: '안전하게 먹는 습관을 알아봐요',
@@ -314,6 +318,8 @@
         },
       ],
     },
+    { id: 'breakout', type: 'breakout', name: '블록깨기', icon: '🧱', desc: '공을 튕겨서 블록을 깨봐요' },
+    { id: 'marble', type: 'marble', name: '구슬 튕겨서 넣기', icon: '🔵', desc: '구슬을 튕겨서 골인시켜봐요' },
   ];
 
   /* ---------------------------------------------------------------- */
@@ -1162,7 +1168,7 @@
       '<div class="card growth-card">' +
       '<div class="growth-icon">' + growth.icon + '</div>' +
       '<div class="growth-info">' +
-      '<div class="growth-label">나의 공감자 · ' + escapeHtml(growth.label) + '</div>' +
+      '<div class="growth-label">나의 감자 · ' + escapeHtml(growth.label) + '</div>' +
       '<div class="text-muted">' + escapeHtml(growth.caption) + '</div>' +
       (atMaxGrowth ? '' : '<div class="text-muted growth-next">다음 단계(' + nextGrowth.icon + ' ' + escapeHtml(nextGrowth.label) + ')까지 한 회기 남았어요</div>') +
       '</div>' +
@@ -1815,12 +1821,23 @@
     }
   }
 
+  function clearCanvasGame() {
+    if (state.canvasGameCleanup) {
+      state.canvasGameCleanup();
+      state.canvasGameCleanup = null;
+    }
+    if (state.canvasAnimId) {
+      cancelAnimationFrame(state.canvasAnimId);
+      state.canvasAnimId = null;
+    }
+  }
+
   function renderGamesList(app) {
     app.innerHTML =
       '<div class="screen">' +
       '<h2 class="screen-title">자유게임</h2>' +
       '<p class="screen-subtitle">재미있는 식생활 게임으로 탐험을 이어가요.</p>' +
-      '<label class="toggle-row"><input type="checkbox" id="timeAttackToggle"' + (state.timeAttackMode ? ' checked' : '') + ' /> ⏱️ 타임어택 모드 (문제당 ' + TIME_ATTACK_SECONDS + '초 제한)</label>' +
+      '<label class="toggle-row"><input type="checkbox" id="timeAttackToggle"' + (state.timeAttackMode ? ' checked' : '') + ' /> ⏱️ 타임어택 모드 (문제당 ' + TIME_ATTACK_SECONDS + '초 제한, 퀴즈 게임에만 적용돼요)</label>' +
       '<div class="menu-grid">' +
       GAMES.map(function (g) {
         return (
@@ -1845,7 +1862,14 @@
   }
 
   function startGame(gameId) {
-    state.gameSession = { gameId: gameId, qIndex: 0, score: 0, answered: false, timeAttack: !!state.timeAttackMode };
+    var game = GAMES.filter(function (g) {
+      return g.id === gameId;
+    })[0];
+    if (game.type === 'breakout' || game.type === 'marble') {
+      state.gameSession = { gameId: gameId };
+    } else {
+      state.gameSession = { gameId: gameId, qIndex: 0, score: 0, answered: false, timeAttack: !!state.timeAttackMode };
+    }
     setScreen('gamePlay');
   }
 
@@ -1864,6 +1888,7 @@
 
   function renderGamePlay(app) {
     clearGameTimer();
+    clearCanvasGame();
     var session = state.gameSession;
     if (!session) {
       setScreen('gamesList');
@@ -1872,6 +1897,16 @@
     var game = GAMES.filter(function (g) {
       return g.id === session.gameId;
     })[0];
+
+    if (game.type === 'breakout') {
+      renderBreakoutGame(app, game);
+      return;
+    }
+    if (game.type === 'marble') {
+      renderMarbleGame(app, game);
+      return;
+    }
+
     var question = game.questions[session.qIndex];
 
     var options = question.options
@@ -1944,14 +1979,16 @@
     var game = GAMES.filter(function (g) {
       return g.id === session.gameId;
     })[0];
+    var total = session.total || (game.questions && game.questions.length) || 0;
+    var statLabel = game.type === 'breakout' ? '깬 블록 수' : game.type === 'marble' ? '골인 횟수' : '맞힌 문제 수';
 
     app.innerHTML =
       '<div class="screen">' +
       '<h2 class="screen-title">게임 결과</h2>' +
       '<div class="card text-center">' +
       '<p class="game-question">' + game.icon + ' ' + escapeHtml(game.name) + (session.timeAttack ? ' <span class="timer-badge">⏱️ 타임어택</span>' : '') + '</p>' +
-      '<div class="stat-tile"><div class="stat-value">' + session.score + ' / ' + game.questions.length + '</div>' +
-      '<div class="stat-label">맞힌 문제 수</div></div>' +
+      '<div class="stat-tile"><div class="stat-value">' + session.score + ' / ' + total + '</div>' +
+      '<div class="stat-label">' + statLabel + '</div></div>' +
       '<div class="wizard-actions mt-1">' +
       '<button type="button" class="btn btn-outline" id="retryBtn">다시 하기</button>' +
       '<button type="button" class="btn btn-secondary" id="otherGameBtn">다른 게임</button>' +
@@ -1969,6 +2006,361 @@
     $('#homeFromGameBtn').addEventListener('click', function () {
       state.gameSession = null;
       setScreen('main');
+    });
+  }
+
+  function canvasScreenMarkup(game, statusText) {
+    return (
+      '<div class="screen">' +
+      '<h2 class="screen-title">' + game.icon + ' ' + escapeHtml(game.name) + '</h2>' +
+      '<p class="screen-subtitle" id="canvasStatus">' + escapeHtml(statusText) + '</p>' +
+      '<div class="card canvas-card"><canvas id="gameCanvas" width="300" height="400"></canvas></div>' +
+      '<div class="wizard-actions" id="canvasResultWrap" hidden>' +
+      '<button type="button" class="btn btn-block" id="canvasResultBtn">결과 보기</button>' +
+      '</div>' +
+      '</div>'
+    );
+  }
+
+  function renderBreakoutGame(app, game) {
+    app.innerHTML = canvasScreenMarkup(game, '화면을 드래그해서 패들을 움직여요. 공을 튕겨서 블록을 모두 깨보세요!');
+
+    var canvas = document.getElementById('gameCanvas');
+    var ctx = canvas.getContext('2d');
+    var width = canvas.width;
+    var height = canvas.height;
+
+    var paddleWidth = 70;
+    var paddleHeight = 12;
+    var paddleX = (width - paddleWidth) / 2;
+
+    var ballRadius = 7;
+    var ballX = width / 2;
+    var ballY = height - 30;
+    var dx = 2.2;
+    var dy = -2.8;
+
+    var rowCount = 4;
+    var colCount = 6;
+    var brickWidth = 40;
+    var brickHeight = 16;
+    var brickPadding = 6;
+    var brickOffsetTop = 30;
+    var brickOffsetLeft = (width - (colCount * (brickWidth + brickPadding) - brickPadding)) / 2;
+
+    var bricks = [];
+    for (var c = 0; c < colCount; c++) {
+      bricks[c] = [];
+      for (var r = 0; r < rowCount; r++) {
+        bricks[c][r] = { alive: true };
+      }
+    }
+
+    var totalBricks = rowCount * colCount;
+    var brokenCount = 0;
+    var ended = false;
+
+    function collisionDetection() {
+      for (var c = 0; c < colCount; c++) {
+        for (var r = 0; r < rowCount; r++) {
+          var b = bricks[c][r];
+          if (!b.alive) continue;
+          var bx = brickOffsetLeft + c * (brickWidth + brickPadding);
+          var by = brickOffsetTop + r * (brickHeight + brickPadding);
+          if (ballX > bx && ballX < bx + brickWidth && ballY > by && ballY < by + brickHeight) {
+            dy = -dy;
+            b.alive = false;
+            brokenCount++;
+          }
+        }
+      }
+    }
+
+    function drawBricks() {
+      for (var c = 0; c < colCount; c++) {
+        for (var r = 0; r < rowCount; r++) {
+          var b = bricks[c][r];
+          if (!b.alive) continue;
+          var bx = brickOffsetLeft + c * (brickWidth + brickPadding);
+          var by = brickOffsetTop + r * (brickHeight + brickPadding);
+          ctx.fillStyle = '#7c4dff';
+          ctx.fillRect(bx, by, brickWidth, brickHeight);
+        }
+      }
+    }
+
+    function endGame(win) {
+      if (ended) return;
+      ended = true;
+      state.gameSession.score = brokenCount;
+      state.gameSession.total = totalBricks;
+      addGameResult(state.store, getCurrentRecord(state.store), {
+        game: game.id,
+        gameName: game.name,
+        score: brokenCount,
+        total: totalBricks,
+        mode: 'arcade',
+      });
+      var statusEl = document.getElementById('canvasStatus');
+      if (statusEl) statusEl.textContent = win ? '블록을 모두 깼어요! 최고예요 🎉' : '공을 놓쳤어요! 결과를 확인해보세요.';
+      var wrap = document.getElementById('canvasResultWrap');
+      if (wrap) wrap.hidden = false;
+    }
+
+    function draw() {
+      if (ended) return;
+      ctx.clearRect(0, 0, width, height);
+      drawBricks();
+
+      ctx.beginPath();
+      ctx.arc(ballX, ballY, ballRadius, 0, Math.PI * 2);
+      ctx.fillStyle = '#e2971f';
+      ctx.fill();
+
+      ctx.fillStyle = '#22b573';
+      ctx.fillRect(paddleX, height - paddleHeight, paddleWidth, paddleHeight);
+
+      collisionDetection();
+
+      if (brokenCount >= totalBricks) {
+        endGame(true);
+        return;
+      }
+
+      if (ballX + dx > width - ballRadius || ballX + dx < ballRadius) dx = -dx;
+      if (ballY + dy < ballRadius) {
+        dy = -dy;
+      } else if (dy > 0 && ballY + dy > height - ballRadius - paddleHeight) {
+        if (ballX > paddleX && ballX < paddleX + paddleWidth) {
+          dy = -dy;
+        } else if (ballY + dy > height - ballRadius) {
+          endGame(false);
+          return;
+        }
+      }
+
+      ballX += dx;
+      ballY += dy;
+
+      state.canvasAnimId = requestAnimationFrame(draw);
+    }
+
+    function pointerX(e) {
+      var rect = canvas.getBoundingClientRect();
+      var clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      return (clientX - rect.left) * (width / rect.width);
+    }
+
+    function onPointerMove(e) {
+      e.preventDefault();
+      var x = pointerX(e) - paddleWidth / 2;
+      paddleX = Math.max(0, Math.min(width - paddleWidth, x));
+    }
+
+    canvas.addEventListener('mousemove', onPointerMove);
+    canvas.addEventListener('touchmove', onPointerMove, { passive: false });
+
+    state.canvasGameCleanup = function () {
+      canvas.removeEventListener('mousemove', onPointerMove);
+      canvas.removeEventListener('touchmove', onPointerMove);
+    };
+
+    draw();
+
+    document.getElementById('canvasResultBtn').addEventListener('click', function () {
+      setScreen('gameResult');
+    });
+  }
+
+  function renderMarbleGame(app, game) {
+    var TOTAL_ROUNDS = 3;
+    app.innerHTML = canvasScreenMarkup(game, '구슬을 당겼다 놓아서 구멍에 넣어보세요! (1 / ' + TOTAL_ROUNDS + ' 라운드)');
+
+    var canvas = document.getElementById('gameCanvas');
+    var ctx = canvas.getContext('2d');
+    var width = canvas.width;
+    var height = canvas.height;
+    var statusEl = document.getElementById('canvasStatus');
+
+    var marbleRadius = 10;
+    var holeRadius = 16;
+    var startX = width / 2;
+    var startY = height - 40;
+
+    var round = 0;
+    var successes = 0;
+    var marbleX = startX;
+    var marbleY = startY;
+    var vx = 0;
+    var vy = 0;
+    var holeX = 0;
+    var holeY = 0;
+    var dragging = false;
+    var dragCurrent = null;
+    var moving = false;
+    var ended = false;
+
+    function newHole() {
+      holeX = 60 + Math.random() * (width - 120);
+      holeY = 60 + Math.random() * (height - 220);
+    }
+
+    function resetRound() {
+      marbleX = startX;
+      marbleY = startY;
+      vx = 0;
+      vy = 0;
+      moving = false;
+      newHole();
+      if (statusEl) statusEl.textContent = '구슬을 당겼다 놓아서 구멍에 넣어보세요! (' + (round + 1) + ' / ' + TOTAL_ROUNDS + ' 라운드)';
+    }
+
+    resetRound();
+
+    function pointerPos(e) {
+      var rect = canvas.getBoundingClientRect();
+      var t = e.touches && e.touches.length ? e.touches[0] : e;
+      return {
+        x: (t.clientX - rect.left) * (width / rect.width),
+        y: (t.clientY - rect.top) * (height / rect.height),
+      };
+    }
+
+    function onDown(e) {
+      if (moving || ended) return;
+      var p = pointerPos(e);
+      if (Math.hypot(p.x - marbleX, p.y - marbleY) < marbleRadius * 3) {
+        dragging = true;
+        dragCurrent = p;
+        e.preventDefault();
+      }
+    }
+
+    function onMove(e) {
+      if (!dragging) return;
+      dragCurrent = pointerPos(e);
+      e.preventDefault();
+    }
+
+    function onUp(e) {
+      if (!dragging) return;
+      dragging = false;
+      var p = dragCurrent || pointerPos(e);
+      var pullX = marbleX - p.x;
+      var pullY = marbleY - p.y;
+      var mag = Math.hypot(pullX, pullY) || 1;
+      var power = Math.min(mag, 90) / 90;
+      vx = (pullX / mag) * power * 11;
+      vy = (pullY / mag) * power * 11;
+      if (power > 0.05) moving = true;
+      dragCurrent = null;
+    }
+
+    canvas.addEventListener('mousedown', onDown);
+    canvas.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    canvas.addEventListener('touchstart', onDown, { passive: false });
+    canvas.addEventListener('touchmove', onMove, { passive: false });
+    canvas.addEventListener('touchend', onUp);
+
+    function finishGame() {
+      ended = true;
+      state.gameSession.score = successes;
+      state.gameSession.total = TOTAL_ROUNDS;
+      addGameResult(state.store, getCurrentRecord(state.store), {
+        game: game.id,
+        gameName: game.name,
+        score: successes,
+        total: TOTAL_ROUNDS,
+        mode: 'arcade',
+      });
+      if (statusEl) statusEl.textContent = '게임 종료! ' + successes + ' / ' + TOTAL_ROUNDS + '번 골인했어요.';
+      var wrap = document.getElementById('canvasResultWrap');
+      if (wrap) wrap.hidden = false;
+    }
+
+    function advanceRound(success) {
+      if (success) successes++;
+      moving = false;
+      round++;
+      if (round >= TOTAL_ROUNDS) {
+        finishGame();
+      } else {
+        setTimeout(resetRound, 400);
+      }
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, width, height);
+
+      ctx.beginPath();
+      ctx.arc(holeX, holeY, holeRadius, 0, Math.PI * 2);
+      ctx.fillStyle = '#26213a';
+      ctx.fill();
+
+      if (dragging && dragCurrent) {
+        ctx.beginPath();
+        ctx.moveTo(marbleX, marbleY);
+        ctx.lineTo(dragCurrent.x, dragCurrent.y);
+        ctx.strokeStyle = '#d64545';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+
+      ctx.beginPath();
+      ctx.arc(marbleX, marbleY, marbleRadius, 0, Math.PI * 2);
+      ctx.fillStyle = '#7c4dff';
+      ctx.fill();
+
+      if (moving) {
+        marbleX += vx;
+        marbleY += vy;
+        vx *= 0.985;
+        vy *= 0.985;
+
+        if (marbleX < marbleRadius) {
+          marbleX = marbleRadius;
+          vx = -vx * 0.7;
+        }
+        if (marbleX > width - marbleRadius) {
+          marbleX = width - marbleRadius;
+          vx = -vx * 0.7;
+        }
+        if (marbleY < marbleRadius) {
+          marbleY = marbleRadius;
+          vy = -vy * 0.7;
+        }
+        if (marbleY > height - marbleRadius) {
+          marbleY = height - marbleRadius;
+          vy = -vy * 0.7;
+        }
+
+        var speed = Math.hypot(vx, vy);
+        var distToHole = Math.hypot(marbleX - holeX, marbleY - holeY);
+
+        if (distToHole < holeRadius - marbleRadius * 0.4) {
+          advanceRound(true);
+        } else if (speed < 0.05) {
+          advanceRound(false);
+        }
+      }
+
+      if (!ended) state.canvasAnimId = requestAnimationFrame(draw);
+    }
+
+    state.canvasGameCleanup = function () {
+      canvas.removeEventListener('mousedown', onDown);
+      canvas.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      canvas.removeEventListener('touchstart', onDown);
+      canvas.removeEventListener('touchmove', onMove);
+      canvas.removeEventListener('touchend', onUp);
+    };
+
+    draw();
+
+    document.getElementById('canvasResultBtn').addEventListener('click', function () {
+      setScreen('gameResult');
     });
   }
 
@@ -2176,7 +2568,7 @@
       '모두 성실히 수행하여 이를 수료하였음을 증명합니다.' +
       '</p>' +
       '<p class="text-muted">획득 배지 ' + unlockedBadgeCount(record) + ' / 10 · 수료일 ' + escapeHtml(completedDate) + '</p>' +
-      '<div class="certificate-signature">🥔 맛마음 탐험소장 공감자</div>' +
+      '<div class="certificate-signature">🥔 맛마음 탐험소장 감자</div>' +
       '</div>' +
       '<button type="button" class="btn btn-block mt-1" id="printCertBtn">인쇄하기 / 저장하기</button>' +
       '</div>';
@@ -2348,6 +2740,7 @@
     });
     $('#homeBtn').addEventListener('click', function () {
       clearGameTimer();
+      clearCanvasGame();
       state.wizard = null;
       state.gameSession = null;
       state.talkSession = null;
@@ -2355,6 +2748,7 @@
     });
     $('#changeSchoolBtn').addEventListener('click', function () {
       clearGameTimer();
+      clearCanvasGame();
       state.store.currentSchoolKey = null;
       saveStore(state.store);
       state.wizard = null;
@@ -2381,6 +2775,7 @@
 
     window.addEventListener('popstate', function (e) {
       clearGameTimer();
+      clearCanvasGame();
       state.wizard = null;
       state.gameSession = null;
       state.talkSession = null;
