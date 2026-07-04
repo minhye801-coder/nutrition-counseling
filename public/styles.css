@@ -263,6 +263,11 @@ a {
   font-size: 1.8rem;
 }
 
+.menu-card > span:last-child {
+  min-width: 0;
+  flex: 1;
+}
+
 .menu-card .menu-title {
   display: block;
   font-weight: 800;
@@ -273,6 +278,9 @@ a {
   display: block;
   font-size: 0.85rem;
   color: var(--color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Choice list (feelings / difficulties / strategies) */

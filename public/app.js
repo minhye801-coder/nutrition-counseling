@@ -255,7 +255,13 @@
   function buildBackupCode(record) {
     var compact = {
       v: 1,
-      sc: [record.schoolInfo.officeCode, record.schoolInfo.schoolCode, record.schoolInfo.schoolName, record.schoolInfo.schoolKind],
+      sc: [
+        record.schoolInfo.officeCode,
+        record.schoolInfo.schoolCode,
+        record.schoolInfo.schoolName,
+        record.schoolInfo.schoolKind,
+        record.nickname || DEFAULT_NICKNAME,
+      ],
       s: record.sessions.map(function (s) {
         return [s.sessionNo, s.date, s.food, s.feeling, s.story || '', s.difficulty || '', s.strategy || '', s.mission, s.confidence];
       }),
@@ -283,6 +289,7 @@
       schoolKind: compact.sc[3],
       address: '',
     };
+    var nickname = compact.sc[4] || DEFAULT_NICKNAME;
     var sessions = (compact.s || []).map(function (a) {
       return {
         sessionNo: a[0],
@@ -306,7 +313,7 @@
       })[0];
       return { game: a[0], gameName: game ? game.name : a[0], score: a[1], total: a[2], playedAt: a[3] + 'T00:00:00.000Z' };
     });
-    return { schoolInfo: schoolInfo, sessions: sessions, missionChecks: missionChecks, gameResults: gameResults };
+    return { schoolInfo: schoolInfo, nickname: nickname, sessions: sessions, missionChecks: missionChecks, gameResults: gameResults };
   }
 
   function applyRestoreCode(code) {
@@ -317,22 +324,23 @@
       showToast('코드를 불러오지 못했어요. 코드가 올바른지 확인해 주세요.');
       return false;
     }
-    var key = schoolKeyOf(decoded.schoolInfo);
+    var key = schoolKeyOf(decoded.schoolInfo, decoded.nickname);
     var existing = state.store.schools[key];
     if (existing && (existing.sessions.length || existing.missionChecks.length || existing.gameResults.length)) {
-      if (!window.confirm(decoded.schoolInfo.schoolName + '의 기존 기록을 이 코드의 기록으로 덮어쓸까요? 이 작업은 되돌릴 수 없어요.')) {
+      if (!window.confirm(decoded.schoolInfo.schoolName + ' · ' + decoded.nickname + '의 기존 기록을 이 코드의 기록으로 덮어쓸까요? 이 작업은 되돌릴 수 없어요.')) {
         return false;
       }
     }
     state.store.schools[key] = {
       schoolInfo: decoded.schoolInfo,
+      nickname: decoded.nickname,
       sessions: decoded.sessions,
       missionChecks: decoded.missionChecks,
       gameResults: decoded.gameResults,
     };
     state.store.currentSchoolKey = key;
     saveStore(state.store);
-    showToast(decoded.schoolInfo.schoolName + '의 기록을 불러왔어요!');
+    showToast(decoded.schoolInfo.schoolName + ' · ' + decoded.nickname + '의 기록을 불러왔어요!');
     return true;
   }
 
@@ -377,17 +385,43 @@
   /* Storage                                                            */
   /* ---------------------------------------------------------------- */
 
+  var DEFAULT_NICKNAME = '기본';
+
+  function emptyStore() {
+    return { version: 2, currentSchoolKey: null, schools: {} };
+  }
+
+  function migrateLegacyKeys(store) {
+    var changed = false;
+    Object.keys(store.schools).forEach(function (key) {
+      if (key.indexOf('::') === -1) {
+        var rec = store.schools[key];
+        var newKey = key + '::' + DEFAULT_NICKNAME;
+        rec.nickname = DEFAULT_NICKNAME;
+        delete store.schools[key];
+        store.schools[newKey] = rec;
+        if (store.currentSchoolKey === key) store.currentSchoolKey = newKey;
+        changed = true;
+      }
+    });
+    return changed;
+  }
+
   function loadStore() {
     try {
       var raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return { version: 1, currentSchoolKey: null, schools: {} };
+      if (!raw) return emptyStore();
       var parsed = JSON.parse(raw);
       if (!parsed || typeof parsed !== 'object' || !parsed.schools) {
-        return { version: 1, currentSchoolKey: null, schools: {} };
+        return emptyStore();
+      }
+      if (migrateLegacyKeys(parsed)) {
+        parsed.version = 2;
+        saveStore(parsed);
       }
       return parsed;
     } catch (err) {
-      return { version: 1, currentSchoolKey: null, schools: {} };
+      return emptyStore();
     }
   }
 
@@ -395,21 +429,42 @@
     localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
   }
 
-  function schoolKeyOf(info) {
-    return info.officeCode + '_' + info.schoolCode;
+  function schoolKeyOf(info, nickname) {
+    return info.officeCode + '_' + info.schoolCode + '::' + nickname;
   }
 
-  function ensureSchoolRecord(store, schoolInfo) {
-    var key = schoolKeyOf(schoolInfo);
+  function schoolPrefixOf(officeCode, schoolCode) {
+    return officeCode + '_' + schoolCode + '::';
+  }
+
+  function listNicknamesForSchool(store, officeCode, schoolCode) {
+    var prefix = schoolPrefixOf(officeCode, schoolCode);
+    return Object.keys(store.schools)
+      .filter(function (k) {
+        return k.indexOf(prefix) === 0;
+      })
+      .map(function (k) {
+        var rec = store.schools[k];
+        return { key: k, nickname: rec.nickname || k.slice(prefix.length), record: rec };
+      })
+      .sort(function (a, b) {
+        return a.nickname.localeCompare(b.nickname, 'ko');
+      });
+  }
+
+  function ensureSchoolRecord(store, schoolInfo, nickname) {
+    var key = schoolKeyOf(schoolInfo, nickname);
     if (!store.schools[key]) {
       store.schools[key] = {
         schoolInfo: schoolInfo,
+        nickname: nickname,
         sessions: [],
         missionChecks: [],
         gameResults: [],
       };
     } else {
       store.schools[key].schoolInfo = schoolInfo;
+      store.schools[key].nickname = nickname;
     }
     store.currentSchoolKey = key;
     saveStore(store);
@@ -550,11 +605,14 @@
     var app = $('#app');
     var changeBtn = $('#changeSchoolBtn');
     var record = getCurrentRecord(state.store);
-    changeBtn.hidden = !record || state.screen === 'schoolSelect';
+    changeBtn.hidden = !record || state.screen === 'schoolSelect' || state.screen === 'nicknameSelect';
 
     switch (state.screen) {
       case 'schoolSelect':
         renderSchoolSelect(app);
+        break;
+      case 'nicknameSelect':
+        renderNicknameSelect(app);
         break;
       case 'main':
         renderMain(app);
@@ -672,9 +730,72 @@
   }
 
   function selectSchool(school) {
-    ensureSchoolRecord(state.store, school);
-    showToast(school.schoolName + '(으)로 입장했어요!');
-    setScreen('main');
+    state.pendingSchoolInfo = school;
+    setScreen('nicknameSelect');
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* Screen: 별명 선택                                                   */
+  /* ---------------------------------------------------------------- */
+
+  function renderNicknameSelect(app) {
+    var current = getCurrentRecord(state.store);
+    var schoolInfo = state.pendingSchoolInfo || (current && current.schoolInfo);
+    if (!schoolInfo) {
+      setScreen('schoolSelect');
+      return;
+    }
+    var siblings = listNicknamesForSchool(state.store, schoolInfo.officeCode, schoolInfo.schoolCode);
+
+    var listHtml = siblings.length
+      ? '<h3>이어서 하기</h3><div class="menu-grid">' +
+        siblings
+          .map(function (s) {
+            return (
+              '<button type="button" class="menu-card" data-nickname-key="' + escapeHtml(s.key) + '">' +
+              '<span class="menu-icon">🙋</span>' +
+              '<span><span class="menu-title">' + escapeHtml(s.nickname) + '</span>' +
+              '<span class="menu-desc">' + progressLabel(s.record) + ' 진행 · 배지 ' + unlockedBadgeCount(s.record) + '/10</span></span>' +
+              '</button>'
+            );
+          })
+          .join('') +
+        '</div>'
+      : '';
+
+    app.innerHTML =
+      '<div class="screen">' +
+      '<h2 class="screen-title">' + escapeHtml(schoolInfo.schoolName) + '</h2>' +
+      '<p class="screen-subtitle">나만 아는 별명으로 들어가요. 실명 대신 별명을 써주세요.</p>' +
+      listHtml +
+      '<div class="card mt-1">' +
+      '<h3>새 별명으로 시작하기</h3>' +
+      '<div class="field"><label for="nicknameInput">별명</label>' +
+      '<input type="text" id="nicknameInput" maxlength="12" placeholder="예: 구름이" /></div>' +
+      '<button type="button" class="btn btn-block" id="startWithNicknameBtn">이 별명으로 시작하기</button>' +
+      '</div>' +
+      '</div>';
+
+    $all('[data-nickname-key]', app).forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        state.store.currentSchoolKey = btn.getAttribute('data-nickname-key');
+        saveStore(state.store);
+        state.pendingSchoolInfo = null;
+        setScreen('main');
+      });
+    });
+
+    $('#startWithNicknameBtn').addEventListener('click', function () {
+      var nickname = $('#nicknameInput').value.trim();
+      if (!nickname) {
+        showToast('별명을 입력해 주세요.');
+        return;
+      }
+      ensureSchoolRecord(state.store, schoolInfo, nickname);
+      state.pendingSchoolInfo = null;
+      showToast(nickname + '(으)로 시작해요!');
+      setScreen('main');
+    });
   }
 
   /* ---------------------------------------------------------------- */
@@ -687,6 +808,7 @@
     { id: 'gamesList', icon: '🎮', title: '자유게임', desc: '재미있는 식생활 게임을 해요' },
     { id: 'badges', icon: '🏅', title: '나의 배지', desc: '모은 배지를 확인해요' },
     { id: 'notes', icon: '📓', title: '탐험노트', desc: '나의 탐험 기록을 모아봐요' },
+    { id: 'switchProfile', icon: '🙋', title: '다른 친구로 전환', desc: '이 학교에서 다른 별명으로 바꿔요' },
     { id: 'privacy', icon: '🔒', title: '체험 데이터 안내', desc: '개인정보와 저장 방식을 안내해요' },
   ];
 
@@ -702,7 +824,7 @@
 
     app.innerHTML =
       '<div class="screen">' +
-      '<h2 class="screen-title">' + escapeHtml(info.schoolName) + '</h2>' +
+      '<h2 class="screen-title">' + escapeHtml(info.schoolName) + ' · ' + escapeHtml(record.nickname || '') + '</h2>' +
       '<p class="screen-subtitle">전국 학교급식 기반 식생활 탐험 웹앱</p>' +
       '<div class="card" id="mealCard"><p class="text-muted">오늘 급식을 불러오는 중이에요...</p></div>' +
       '<div class="card">' +
@@ -730,7 +852,13 @@
 
     $all('.menu-card[data-screen]', app).forEach(function (btn) {
       btn.addEventListener('click', function () {
-        setScreen(btn.getAttribute('data-screen'));
+        var target = btn.getAttribute('data-screen');
+        if (target === 'switchProfile') {
+          state.pendingSchoolInfo = record.schoolInfo;
+          setScreen('nicknameSelect');
+          return;
+        }
+        setScreen(target);
       });
     });
 
@@ -1348,6 +1476,7 @@
       '<li>서버나 데이터베이스에 탐험기록을 저장하지 않아요.</li>' +
       '<li>기록은 지금 사용 중인 브라우저의 localStorage에만 저장돼요.</li>' +
       '<li>브라우저나 기기를 바꾸면 기록이 이어지지 않아요. (아래 백업 큐알을 쓰면 이어갈 수 있어요)</li>' +
+      '<li>같은 기기에서도 별명별로 기록이 나뉘어 저장돼요. 이름 대신 자유롭게 지은 별명을 써주세요.</li>' +
       '<li>시크릿(비공개) 모드는 창을 닫으면 기록이 사라질 수 있어요.</li>' +
       '</ul>' +
       '</div>' +
@@ -1365,7 +1494,9 @@
       '</div>' +
       '<div class="card">' +
       '<h3>현재 학교 체험기록 삭제</h3>' +
-      '<p class="text-muted">' + (record ? escapeHtml(record.schoolInfo.schoolName) : '선택된 학교') + '의 탐험기록, 점검기록, 게임기록을 모두 삭제해요.</p>' +
+      '<p class="text-muted">' +
+      (record ? escapeHtml(record.schoolInfo.schoolName) + ' · ' + escapeHtml(record.nickname || '') : '선택된 학교') +
+      '의 탐험기록, 점검기록, 게임기록을 모두 삭제해요. (다른 별명의 기록에는 영향을 주지 않아요)</p>' +
       '<button type="button" class="btn btn-danger" id="deleteRecordBtn"' + (record ? '' : ' disabled') + '>현재 학교 체험기록 삭제</button>' +
       '</div>' +
       '</div>';
