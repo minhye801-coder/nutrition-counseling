@@ -137,13 +137,27 @@
     },
   };
 
+  var PROGRAM_NAME = '맛마음 탐험 프로그램';
+
+  function curriculumStageName(n) {
+    var stage = Math.min(Math.max(n, 1), 5);
+    return TALK_CARDS[stage].theme;
+  }
+
+  function curriculumStageLabel(n) {
+    var stage = Math.min(Math.max(n, 1), 5);
+    return stage + '단계 · ' + curriculumStageName(stage);
+  }
+
+  // "공감자" mascot: 공감(empathy) + 감자(potato) wordplay — a friend who
+  // grows warmer and more expressive as the student's exploration continues.
   var GROWTH_STAGES = [
-    { icon: '🌰', label: '잠든 씨앗', caption: '아직 탐험을 시작하지 않았어요' },
-    { icon: '🌱', label: '새싹', caption: '새싹이 돋아났어요!' },
-    { icon: '🌿', label: '떡잎', caption: '잎이 무럭무럭 자라고 있어요' },
-    { icon: '🌳', label: '작은 나무', caption: '작은 나무가 되었어요' },
-    { icon: '🌸', label: '꽃봉오리', caption: '꽃을 활짝 피웠어요!' },
-    { icon: '🌈', label: '맛마음 나무', caption: '맛마음 나무가 멋지게 자랐어요!' },
+    { icon: '🥔', label: '낯선 감자', caption: '아직 탐험을 시작하지 않았어요' },
+    { icon: '🥔🌱', label: '새싹 난 공감자', caption: '작은 새싹이 돋아났어요!' },
+    { icon: '🥔✨', label: '반짝이는 공감자', caption: '조금씩 반짝이기 시작했어요' },
+    { icon: '🥔💪', label: '씩씩한 공감자', caption: '씩씩하게 자라고 있어요' },
+    { icon: '🥔🌟', label: '빛나는 공감자', caption: '눈부시게 빛나고 있어요!' },
+    { icon: '🥔👑', label: '완전체 공감자', caption: '멋진 공감자로 완전히 자랐어요!' },
   ];
 
   function growthStageFor(record) {
@@ -736,6 +750,50 @@
     return text;
   }
 
+  function buildConfidenceChartSvg(sessionsByOrder) {
+    var width = 280;
+    var height = 120;
+    var padding = 20;
+    var minVal = 1;
+    var maxVal = 10;
+    var stepX = sessionsByOrder.length > 1 ? (width - padding * 2) / (sessionsByOrder.length - 1) : 0;
+    var points = sessionsByOrder.map(function (s, i) {
+      var x = padding + stepX * i;
+      var y = height - padding - ((s.confidence - minVal) / (maxVal - minVal)) * (height - padding * 2);
+      return x.toFixed(1) + ',' + y.toFixed(1);
+    });
+    var circles = points
+      .map(function (p) {
+        var parts = p.split(',');
+        return '<circle cx="' + parts[0] + '" cy="' + parts[1] + '" r="4" fill="var(--color-primary)" />';
+      })
+      .join('');
+    return (
+      '<svg viewBox="0 0 ' + width + ' ' + height + '" class="confidence-chart" role="img" aria-label="자신감 변화 그래프">' +
+      '<polyline points="' + points.join(' ') + '" fill="none" stroke="var(--color-primary)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />' +
+      circles +
+      '</svg>'
+    );
+  }
+
+  function buildConfidenceSection(record) {
+    if (!record.sessions.length) return '';
+    var byOrder = record.sessions.slice().sort(function (a, b) {
+      return a.sessionNo - b.sessionNo;
+    });
+    var first = byOrder[0].confidence;
+    var last = byOrder[byOrder.length - 1].confidence;
+    var diff = last - first;
+    var diffText = diff > 0 ? '+' + diff + '점' : diff < 0 ? diff + '점' : '변화 없음';
+    return (
+      '<div class="card">' +
+      '<h3>자신감 변화</h3>' +
+      buildConfidenceChartSvg(byOrder) +
+      '<p class="text-muted mb-0">1회기 ' + first + '점 → 최근 ' + last + '점 (' + diffText + ')</p>' +
+      '</div>'
+    );
+  }
+
   /* ---------------------------------------------------------------- */
   /* App state                                                          */
   /* ---------------------------------------------------------------- */
@@ -766,9 +824,12 @@
     var backBtn = $('#backBtn');
     var record = getCurrentRecord(state.store);
     changeBtn.hidden = !record || state.screen === 'schoolSelect' || state.screen === 'nicknameSelect';
-    backBtn.hidden = state.screen === 'main' || state.screen === 'schoolSelect';
+    backBtn.hidden = state.screen === 'main' || state.screen === 'schoolSelect' || state.screen === 'onboarding';
 
     switch (state.screen) {
+      case 'onboarding':
+        renderOnboarding(app);
+        break;
       case 'schoolSelect':
         renderSchoolSelect(app);
         break;
@@ -802,12 +863,83 @@
       case 'notes':
         renderNotes(app);
         break;
+      case 'report':
+        renderReport(app);
+        break;
+      case 'certificate':
+        renderCertificate(app);
+        break;
       case 'privacy':
         renderPrivacy(app);
         break;
       default:
         app.innerHTML = '<div class="card">불러오는 중이에요...</div>';
     }
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* Screen: 온보딩 소개                                                 */
+  /* ---------------------------------------------------------------- */
+
+  var ONBOARDING_SLIDES = [
+    {
+      icon: '🍚',
+      title: '맛마음 탐험소에 오신 걸 환영해요!',
+      body: '전국 학교급식을 기반으로 나의 식생활을 탐험하는 ' + PROGRAM_NAME + '이에요.',
+    },
+    {
+      icon: '🧭',
+      title: '이렇게 진행돼요',
+      body: '학교 선택 → 별명 만들기 → 오늘의 탐험(느낌 찾기 → 어려움과 전략 → 미션) → 오늘의 한마디로 대화, 이 흐름이 서로 다른 날짜에 5회기 이어져요.',
+    },
+    {
+      icon: '🔒',
+      title: '안심하고 사용하세요',
+      body: '이름, 학년/반, 학번 등 어떤 개인정보도 수집하지 않아요. 모든 기록은 지금 사용 중인 기기에만 저장돼요.',
+    },
+  ];
+
+  function renderOnboarding(app) {
+    var idx = state.onboardingIndex || 0;
+    var slide = ONBOARDING_SLIDES[idx];
+    var isLast = idx === ONBOARDING_SLIDES.length - 1;
+    var dots = ONBOARDING_SLIDES.map(function (_, i) {
+      return '<span class="step-dot' + (i <= idx ? ' active' : '') + '"></span>';
+    }).join('');
+
+    app.innerHTML =
+      '<div class="screen">' +
+      '<div class="step-indicator">' + dots + '</div>' +
+      '<div class="card text-center onboarding-card">' +
+      '<div class="onboarding-icon">' + slide.icon + '</div>' +
+      '<h2>' + escapeHtml(slide.title) + '</h2>' +
+      '<p class="text-muted">' + escapeHtml(slide.body) + '</p>' +
+      '</div>' +
+      '<div class="wizard-actions">' +
+      (idx > 0 ? '<button type="button" class="btn btn-outline" id="onboardingPrevBtn">이전</button>' : '') +
+      '<button type="button" class="btn" id="onboardingNextBtn">' + (isLast ? '학교 찾기 시작하기' : '다음') + '</button>' +
+      '</div>' +
+      '</div>';
+
+    var prevBtn = $('#onboardingPrevBtn');
+    if (prevBtn) {
+      prevBtn.addEventListener('click', function () {
+        state.onboardingIndex = idx - 1;
+        render();
+      });
+    }
+
+    $('#onboardingNextBtn').addEventListener('click', function () {
+      if (isLast) {
+        state.store.onboardingSeen = true;
+        saveStore(state.store);
+        state.onboardingIndex = 0;
+        setScreen('schoolSelect');
+      } else {
+        state.onboardingIndex = idx + 1;
+        render();
+      }
+    });
   }
 
   /* ---------------------------------------------------------------- */
@@ -834,15 +966,20 @@
       '<div class="field"><label for="querySearchInput">3. 학교 이름</label>' +
       '<input type="search" id="querySearchInput" placeholder="예: 한빛초등학교" autocomplete="off" />' +
       '<p class="field-hint">2글자 이상 입력해 주세요.</p></div>' +
-      '<button type="button" id="searchSchoolBtn" class="btn btn-block">4. 학교 검색</button>' +
+      '<button type="button" id="searchSchoolBtn" class="btn btn-block">학교 검색</button>' +
       '</div>' +
       '<div id="schoolSearchStatus"></div>' +
       '<div id="schoolResults" class="card-grid"></div>' +
+      '<button type="button" class="btn btn-outline btn-block mt-1" id="showOnboardingBtn">프로그램 소개 다시 보기</button>' +
       '</div>';
 
     $('#searchSchoolBtn').addEventListener('click', doSchoolSearch);
     $('#querySearchInput').addEventListener('keydown', function (e) {
       if (e.key === 'Enter') doSchoolSearch();
+    });
+    $('#showOnboardingBtn').addEventListener('click', function () {
+      state.onboardingIndex = 0;
+      setScreen('onboarding');
     });
   }
 
@@ -997,6 +1134,8 @@
     { id: 'gamesList', icon: '🎮', title: '자유게임', desc: '재미있는 식생활 게임을 해요' },
     { id: 'badges', icon: '🏅', title: '나의 배지', desc: '모은 배지를 확인해요' },
     { id: 'notes', icon: '📓', title: '탐험노트', desc: '나의 탐험 기록을 모아봐요' },
+    { id: 'report', icon: '🗂️', title: '상담 리포트', desc: '오늘 상담 내용을 한 장으로 확인해요' },
+    { id: 'certificate', icon: '🏆', title: '수료증', desc: '5회기를 모두 마치면 수료증을 받아요' },
     { id: 'switchProfile', icon: '🙋', title: '다른 친구로 전환', desc: '이 학교에서 다른 별명으로 바꿔요' },
     { id: 'privacy', icon: '🔒', title: '체험 데이터 안내', desc: '개인정보와 저장 방식을 안내해요' },
   ];
@@ -1023,7 +1162,7 @@
       '<div class="card growth-card">' +
       '<div class="growth-icon">' + growth.icon + '</div>' +
       '<div class="growth-info">' +
-      '<div class="growth-label">나의 맛마음 나무 · ' + escapeHtml(growth.label) + '</div>' +
+      '<div class="growth-label">나의 공감자 · ' + escapeHtml(growth.label) + '</div>' +
       '<div class="text-muted">' + escapeHtml(growth.caption) + '</div>' +
       (atMaxGrowth ? '' : '<div class="text-muted growth-next">다음 단계(' + nextGrowth.icon + ' ' + escapeHtml(nextGrowth.label) + ')까지 한 회기 남았어요</div>') +
       '</div>' +
@@ -1173,6 +1312,7 @@
       return;
     }
     var wizard = ensureWizard();
+    var stageLabel = curriculumStageLabel(completedSessionCount(record) + 1);
     var stepDots = [1, 2, 3]
       .map(function (n) {
         return '<span class="step-dot' + (n <= wizard.step ? ' active' : '') + '"></span>';
@@ -1187,6 +1327,7 @@
     app.innerHTML =
       '<div class="screen">' +
       '<h2 class="screen-title">오늘의 탐험</h2>' +
+      '<p class="screen-subtitle">' + escapeHtml(PROGRAM_NAME) + ' · ' + escapeHtml(stageLabel) + '</p>' +
       '<div class="step-indicator">' + stepDots + '</div>' +
       '<div class="card" id="wizardCard">' + body + '</div>' +
       '</div>';
@@ -1479,7 +1620,7 @@
             }).join('');
             return (
               '<div class="card" data-session="' + s.sessionNo + '">' +
-              '<h3>' + s.sessionNo + '회기 · ' + escapeHtml(s.date) + '</h3>' +
+              '<h3>' + s.sessionNo + '회기 · ' + escapeHtml(curriculumStageName(s.sessionNo)) + ' · ' + escapeHtml(s.date) + '</h3>' +
               '<p><strong>미션:</strong> ' + escapeHtml(s.mission) + '</p>' +
               '<div class="choice-list">' + statusButtons + '</div>' +
               '<div class="field mt-1"><label for="note-' + s.sessionNo + '">한 줄 돌아보기</label>' +
@@ -1846,7 +1987,7 @@
     app.innerHTML =
       '<div class="screen">' +
       '<h2 class="screen-title">나의 배지</h2>' +
-      '<p class="screen-subtitle">' + unlockedBadgeCount(record) + ' / 10개 획득</p>' +
+      '<p class="screen-subtitle">' + escapeHtml(PROGRAM_NAME) + ' · ' + unlockedBadgeCount(record) + ' / 10개 획득</p>' +
       '<div class="badge-grid">' +
       BADGES.map(function (b) {
         var unlocked = b.session <= count;
@@ -1883,7 +2024,7 @@
           .map(function (s) {
             return (
               '<div class="note-entry">' +
-              '<div class="note-meta">' + s.sessionNo + '회기 · ' + escapeHtml(s.date) + '</div>' +
+              '<div class="note-meta">' + s.sessionNo + '회기 · ' + escapeHtml(curriculumStageName(s.sessionNo)) + ' · ' + escapeHtml(s.date) + '</div>' +
               '<dl>' +
               '<dt>음식</dt><dd>' + escapeHtml(s.food) + '</dd>' +
               '<dt>느낌</dt><dd>' + escapeHtml(s.feeling) + '</dd>' +
@@ -1901,6 +2042,7 @@
       '<div class="screen">' +
       '<h2 class="screen-title">탐험노트</h2>' +
       '<div class="card"><h3>나의 음식생활 설명서</h3><p class="mb-0">' + escapeHtml(buildProfileSummary(record)) + '</p></div>' +
+      buildConfidenceSection(record) +
       '<div class="flex-row mt-1">' +
       '<button type="button" class="btn btn-sm ' + (state.notesSort === 'newest' ? '' : 'btn-outline') + '" id="sortNewestBtn">최신순</button>' +
       '<button type="button" class="btn btn-sm ' + (state.notesSort === 'oldest' ? '' : 'btn-outline') + '" id="sortOldestBtn">시간순</button>' +
@@ -1915,6 +2057,132 @@
     $('#sortOldestBtn').addEventListener('click', function () {
       state.notesSort = 'oldest';
       render();
+    });
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* Screen: 상담 리포트                                                 */
+  /* ---------------------------------------------------------------- */
+
+  function renderReport(app) {
+    var record = getCurrentRecord(state.store);
+    if (!record) {
+      setScreen('schoolSelect');
+      return;
+    }
+
+    if (!record.sessions.length) {
+      app.innerHTML =
+        '<div class="screen">' +
+        '<h2 class="screen-title">상담 리포트</h2>' +
+        '<div class="card">아직 탐험 기록이 없어요. "오늘의 탐험"을 먼저 완료해 주세요.</div>' +
+        '</div>';
+      return;
+    }
+
+    var byOrder = record.sessions.slice().sort(function (a, b) {
+      return a.sessionNo - b.sessionNo;
+    });
+    var latest = byOrder[byOrder.length - 1];
+    var latestTalk = (record.talkNotes || [])
+      .slice()
+      .sort(function (a, b) {
+        return (a.savedAt || '').localeCompare(b.savedAt || '');
+      })
+      .pop();
+
+    var talkSection = '';
+    if (latestTalk) {
+      var talkLines = latestTalk.questions
+        .map(function (q, i) {
+          var a = latestTalk.answers[i];
+          return '<p class="mb-0"><em>' + escapeHtml(q) + '</em><br />' + (a ? escapeHtml(a) : '<span class="text-muted">(기록 없음)</span>') + '</p>';
+        })
+        .join('');
+      talkSection = '<hr class="section-divider" /><p><strong>오늘의 한마디</strong></p>' + talkLines;
+    }
+
+    app.innerHTML =
+      '<div class="screen">' +
+      '<h2 class="screen-title">상담 리포트</h2>' +
+      '<p class="screen-subtitle">' + escapeHtml(PROGRAM_NAME) + ' · 인쇄하거나 화면으로 보여주세요</p>' +
+      '<div class="card report-card" id="reportCard">' +
+      '<div class="report-header">' +
+      '<div>' +
+      '<div class="report-title">맛마음 탐험 상담 리포트</div>' +
+      '<div class="text-muted">' + escapeHtml(record.schoolInfo.schoolName) + ' · ' + escapeHtml(record.nickname || '') + '</div>' +
+      '</div>' +
+      '<div class="text-muted">' + escapeHtml(latest.date) + '</div>' +
+      '</div>' +
+      '<hr class="section-divider" />' +
+      '<p class="mb-0"><strong>' + latest.sessionNo + '회기 · ' + escapeHtml(curriculumStageName(latest.sessionNo)) + '</strong></p>' +
+      '<dl class="report-dl">' +
+      '<dt>오늘의 음식</dt><dd>' + escapeHtml(latest.food) + '</dd>' +
+      '<dt>느낌</dt><dd>' + escapeHtml(latest.feeling) + '</dd>' +
+      (latest.difficulty ? '<dt>어려움</dt><dd>' + escapeHtml(latest.difficulty) + '</dd>' : '') +
+      (latest.strategy ? '<dt>전략</dt><dd>' + escapeHtml(latest.strategy) + '</dd>' : '') +
+      '<dt>실천 미션</dt><dd>' + escapeHtml(latest.mission) + '</dd>' +
+      '<dt>자신감</dt><dd>' + latest.confidence + ' / 10</dd>' +
+      '</dl>' +
+      talkSection +
+      '</div>' +
+      '<button type="button" class="btn btn-block mt-1" id="printReportBtn">인쇄하기 / 저장하기</button>' +
+      '</div>';
+
+    $('#printReportBtn').addEventListener('click', function () {
+      window.print();
+    });
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* Screen: 수료증                                                     */
+  /* ---------------------------------------------------------------- */
+
+  function renderCertificate(app) {
+    var record = getCurrentRecord(state.store);
+    if (!record) {
+      setScreen('schoolSelect');
+      return;
+    }
+    var count = completedSessionCount(record);
+
+    if (count < 5) {
+      app.innerHTML =
+        '<div class="screen">' +
+        '<h2 class="screen-title">수료증</h2>' +
+        '<div class="card text-center">' +
+        '<div class="onboarding-icon">🔒</div>' +
+        '<p>아직 진행 중이에요! <strong>' + progressLabel(record) + '</strong> 회기를 마치면 수료증을 받을 수 있어요.</p>' +
+        '</div>' +
+        '</div>';
+      return;
+    }
+
+    var byOrder = record.sessions.slice().sort(function (a, b) {
+      return a.sessionNo - b.sessionNo;
+    });
+    var completedDate = byOrder[4] ? byOrder[4].date : byOrder[byOrder.length - 1].date;
+
+    app.innerHTML =
+      '<div class="screen">' +
+      '<h2 class="screen-title">수료증</h2>' +
+      '<div class="card certificate-card" id="certificateCard">' +
+      '<div class="certificate-seal">🏆</div>' +
+      '<div class="certificate-title">수 료 증</div>' +
+      '<p class="certificate-name">' + escapeHtml(record.nickname || '') + '</p>' +
+      '<p class="certificate-body">' +
+      '위 학생은 <strong>' + escapeHtml(record.schoolInfo.schoolName) + '</strong>에서 진행한<br />' +
+      escapeHtml(PROGRAM_NAME) + ' 전 5단계(관찰과 표현 → 감각과 어려움 → 전략과 미션 → 실천과 도움 → 성장과 안내)를<br />' +
+      '모두 성실히 수행하여 이를 수료하였음을 증명합니다.' +
+      '</p>' +
+      '<p class="text-muted">획득 배지 ' + unlockedBadgeCount(record) + ' / 10 · 수료일 ' + escapeHtml(completedDate) + '</p>' +
+      '<div class="certificate-signature">🥔 맛마음 탐험소장 공감자</div>' +
+      '</div>' +
+      '<button type="button" class="btn btn-block mt-1" id="printCertBtn">인쇄하기 / 저장하기</button>' +
+      '</div>';
+
+    $('#printCertBtn').addEventListener('click', function () {
+      window.print();
     });
   }
 
@@ -2105,7 +2373,8 @@
     }
 
     var record = getCurrentRecord(state.store);
-    var initialScreen = record ? 'main' : 'schoolSelect';
+    var isFreshVisit = !record && Object.keys(state.store.schools).length === 0 && !state.store.onboardingSeen;
+    var initialScreen = record ? 'main' : isFreshVisit ? 'onboarding' : 'schoolSelect';
     state.screen = initialScreen;
     window.history.replaceState({ screen: initialScreen }, '', window.location.pathname);
     render();

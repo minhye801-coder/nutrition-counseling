@@ -534,6 +534,15 @@ input[type="range"] {
   background: var(--color-border);
 }
 
+.onboarding-card {
+  padding: 2.5rem 1.5rem;
+}
+
+.onboarding-icon {
+  font-size: 3.5rem;
+  margin-bottom: 0.8rem;
+}
+
 .step-dot.active {
   background: var(--color-primary);
 }
@@ -620,6 +629,97 @@ input[type="range"] {
 
 .note-entry dd {
   margin: 0;
+}
+
+.confidence-chart {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: 320px;
+  margin: 0.5rem 0;
+}
+
+/* Counseling report */
+.report-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+
+.report-title {
+  font-weight: 800;
+  font-size: 1.1rem;
+}
+
+.report-dl {
+  margin: 0.6rem 0 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.25rem 0.8rem;
+}
+
+.report-dl dt {
+  font-weight: 700;
+  color: var(--color-text-muted);
+}
+
+.report-dl dd {
+  margin: 0;
+}
+
+/* Certificate */
+.certificate-card {
+  text-align: center;
+  border: 3px double var(--color-primary);
+  background: linear-gradient(180deg, #fff, var(--color-primary-light));
+}
+
+.certificate-seal {
+  font-size: 3rem;
+}
+
+.certificate-title {
+  font-size: 1.6rem;
+  font-weight: 800;
+  letter-spacing: 0.3em;
+  color: var(--color-primary-dark);
+  margin: 0.3rem 0 1rem;
+}
+
+.certificate-name {
+  font-size: 1.3rem;
+  font-weight: 800;
+  margin-bottom: 0.8rem;
+}
+
+.certificate-body {
+  line-height: 1.9;
+}
+
+.certificate-signature {
+  margin-top: 1.2rem;
+  font-weight: 700;
+  color: var(--color-primary-dark);
+}
+
+@media print {
+  .app-header,
+  .toast,
+  #loadingOverlay,
+  .btn,
+  .menu-grid {
+    display: none !important;
+  }
+
+  body {
+    background: #fff;
+  }
+
+  .card {
+    box-shadow: none;
+    border: 1px solid #ccc;
+  }
 }
 
 /* Tarot-style talk cards */
