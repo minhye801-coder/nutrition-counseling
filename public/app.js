@@ -366,6 +366,9 @@
       gameResults: decoded.gameResults,
     };
     state.store.currentSchoolKey = key;
+    state.wizard = null;
+    state.gameSession = null;
+    state.todayMeal = null;
     saveStore(state.store);
     showToast(decoded.schoolInfo.schoolName + ' · ' + decoded.nickname + '의 기록을 불러왔어요!');
     return true;
@@ -811,6 +814,9 @@
         state.store.currentSchoolKey = btn.getAttribute('data-nickname-key');
         saveStore(state.store);
         state.pendingSchoolInfo = null;
+        state.wizard = null;
+        state.gameSession = null;
+        state.todayMeal = null;
         setScreen('main');
       });
     });
@@ -823,6 +829,9 @@
       }
       ensureSchoolRecord(state.store, schoolInfo, nickname);
       state.pendingSchoolInfo = null;
+      state.wizard = null;
+      state.gameSession = null;
+      state.todayMeal = null;
       showToast(nickname + '(으)로 시작해요!');
       setScreen('main');
     });
@@ -1719,6 +1728,7 @@
       saveStore(state.store);
       state.wizard = null;
       state.gameSession = null;
+      state.todayMeal = null;
       setScreen('schoolSelect');
     });
 
