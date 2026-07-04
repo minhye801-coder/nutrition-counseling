@@ -563,6 +563,14 @@
     return store.schools[key];
   }
 
+  function deleteProfile(store, key) {
+    delete store.schools[key];
+    if (store.currentSchoolKey === key) {
+      store.currentSchoolKey = null;
+    }
+    saveStore(store);
+  }
+
   function getCurrentRecord(store) {
     if (!store.currentSchoolKey) return null;
     return store.schools[store.currentSchoolKey] || null;
@@ -850,11 +858,14 @@
         siblings
           .map(function (s) {
             return (
-              '<button type="button" class="menu-card" data-nickname-key="' + escapeHtml(s.key) + '">' +
+              '<div class="menu-card nickname-card">' +
               '<span class="menu-icon">🙋</span>' +
-              '<span><span class="menu-title">' + escapeHtml(s.nickname) + '</span>' +
-              '<span class="menu-desc">' + progressLabel(s.record) + ' 진행 · 배지 ' + unlockedBadgeCount(s.record) + '/10</span></span>' +
-              '</button>'
+              '<button type="button" class="menu-resume-btn" data-nickname-key="' + escapeHtml(s.key) + '">' +
+              '<span class="menu-title">' + escapeHtml(s.nickname) + '</span>' +
+              '<span class="menu-desc">' + progressLabel(s.record) + ' 진행 · 배지 ' + unlockedBadgeCount(s.record) + '/10</span>' +
+              '</button>' +
+              '<button type="button" class="icon-btn-danger" data-nickname-delete="' + escapeHtml(s.key) + '" aria-label="별명 삭제">🗑️</button>' +
+              '</div>'
             );
           })
           .join('') +
@@ -884,6 +895,19 @@
         state.todayMeal = null;
         state.talkSession = null;
         setScreen('main');
+      });
+    });
+
+    $all('[data-nickname-delete]', app).forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var key = btn.getAttribute('data-nickname-delete');
+        var rec = state.store.schools[key];
+        if (!rec) return;
+        if (!window.confirm((rec.nickname || '') + ' 별명을 완전히 삭제할까요? 이 별명의 모든 기록이 사라지고 목록에서도 없어져요. 되돌릴 수 없어요.')) return;
+        deleteProfile(state.store, key);
+        showToast('별명을 삭제했어요.');
+        render();
       });
     });
 
@@ -1815,25 +1839,54 @@
       '<button type="button" class="btn btn-outline" id="restoreCodeBtn">코드 불러오기</button>' +
       '</div>' +
       '<div class="card">' +
-      '<h3>현재 학교 체험기록 삭제</h3>' +
+      '<h3>현재 별명 기록 초기화</h3>' +
       '<p class="text-muted">' +
       (record ? escapeHtml(record.schoolInfo.schoolName) + ' · ' + escapeHtml(record.nickname || '') : '선택된 학교') +
-      '의 탐험기록, 점검기록, 게임기록을 모두 삭제해요. (다른 별명의 기록에는 영향을 주지 않아요)</p>' +
-      '<button type="button" class="btn btn-danger" id="deleteRecordBtn"' + (record ? '' : ' disabled') + '>현재 학교 체험기록 삭제</button>' +
+      '의 탐험기록, 점검기록, 게임기록을 0부터 다시 시작해요. 별명 자체는 목록에 그대로 남아요.</p>' +
+      '<button type="button" class="btn btn-danger" id="deleteRecordBtn"' + (record ? '' : ' disabled') + '>현재 별명 기록 초기화</button>' +
+      '</div>' +
+      '<div class="card">' +
+      '<h3>현재 별명 완전히 삭제</h3>' +
+      '<p class="text-muted">' +
+      (record ? escapeHtml(record.schoolInfo.schoolName) + ' · ' + escapeHtml(record.nickname || '') : '선택된 학교') +
+      ' 별명 자체를 목록에서 없애요. 위 초기화와 달리, 다음에 "다른 친구로 전환"에서 이 별명이 더 이상 보이지 않아요.</p>' +
+      '<button type="button" class="btn btn-danger" id="deleteNicknameBtn"' + (record ? '' : ' disabled') + '>현재 별명 완전히 삭제</button>' +
       '</div>' +
       '</div>';
 
     var deleteBtn = $('#deleteRecordBtn');
     if (deleteBtn && record) {
       deleteBtn.addEventListener('click', function () {
-        if (!window.confirm('정말 현재 학교의 모든 체험기록을 삭제할까요? 이 작업은 되돌릴 수 없어요.')) return;
+        if (!window.confirm('정말 현재 별명의 모든 체험기록을 초기화할까요? 이 작업은 되돌릴 수 없어요.')) return;
         record.sessions = [];
         record.missionChecks = [];
         record.gameResults = [];
         record.talkNotes = [];
         saveStore(state.store);
-        showToast('체험기록을 삭제했어요.');
+        showToast('체험기록을 초기화했어요.');
         setScreen('main');
+      });
+    }
+
+    var deleteNicknameBtn = $('#deleteNicknameBtn');
+    if (deleteNicknameBtn && record) {
+      deleteNicknameBtn.addEventListener('click', function () {
+        if (!window.confirm(record.schoolInfo.schoolName + ' · ' + record.nickname + ' 별명을 완전히 삭제할까요? 모든 기록이 사라지고 목록에서도 없어져요. 되돌릴 수 없어요.')) return;
+        var schoolInfo = record.schoolInfo;
+        var key = state.store.currentSchoolKey;
+        deleteProfile(state.store, key);
+        state.wizard = null;
+        state.gameSession = null;
+        state.todayMeal = null;
+        state.talkSession = null;
+        showToast('별명을 삭제했어요.');
+        var siblings = listNicknamesForSchool(state.store, schoolInfo.officeCode, schoolInfo.schoolCode);
+        if (siblings.length) {
+          state.pendingSchoolInfo = schoolInfo;
+          setScreen('nicknameSelect');
+        } else {
+          setScreen('schoolSelect');
+        }
       });
     }
 
