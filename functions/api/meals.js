@@ -1,5 +1,5 @@
 import {
-  callNeis,
+  callNeisAllPages,
   jsonResponse,
   errorResponse,
   getKstDateString,
@@ -49,12 +49,13 @@ export async function onRequestGet(context) {
   if (cached) return cached;
 
   try {
-    const rows = await callNeis(env.NEIS_API_KEY, 'mealServiceDietInfo', {
+    // NEIS doesn't reliably filter by MLSV_FROMYMD/MLSV_TOYMD for this endpoint, so
+    // fetch the school's full paginated history and filter for the target date ourselves.
+    const rows = await callNeisAllPages(env.NEIS_API_KEY, 'mealServiceDietInfo', {
       ATPT_OFCDC_SC_CODE: officeCode,
       SD_SCHUL_CODE: schoolCode,
       MLSV_FROMYMD: date,
       MLSV_TOYMD: addDaysToYmd(date, SEARCH_FORWARD_DAYS),
-      pSize: 100,
     });
 
     const byDate = new Map();

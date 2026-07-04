@@ -605,8 +605,10 @@
   function render() {
     var app = $('#app');
     var changeBtn = $('#changeSchoolBtn');
+    var backBtn = $('#backBtn');
     var record = getCurrentRecord(state.store);
     changeBtn.hidden = !record || state.screen === 'schoolSelect' || state.screen === 'nicknameSelect';
+    backBtn.hidden = state.screen === 'main' || state.screen === 'schoolSelect';
 
     switch (state.screen) {
       case 'schoolSelect':
@@ -1650,6 +1652,9 @@
   }
 
   function init() {
+    $('#backBtn').addEventListener('click', function () {
+      window.history.back();
+    });
     $('#homeBtn').addEventListener('click', function () {
       state.wizard = null;
       state.gameSession = null;

@@ -61,24 +61,30 @@ export function cleanDishName(name) {
 function parseNeisPayload(json, endpoint) {
   if (json.RESULT) {
     const code = json.RESULT.CODE || '';
-    if (code === 'INFO-200') return [];
+    if (code === 'INFO-200') return { rows: [], totalCount: 0 };
     throw new NeisError(json.RESULT.MESSAGE || '나이스 API에서 오류가 발생했습니다.');
   }
   const body = json[endpoint];
-  if (!Array.isArray(body) || body.length < 2) return [];
+  if (!Array.isArray(body) || body.length < 2) return { rows: [], totalCount: 0 };
+  const headPart = body.find((part) => Array.isArray(part && part.head));
+  let totalCount = 0;
+  if (headPart) {
+    const countEntry = headPart.head.find((h) => typeof h.list_total_count === 'number');
+    if (countEntry) totalCount = countEntry.list_total_count;
+  }
   const rowsPart = body.find((part) => Array.isArray(part && part.row));
-  return rowsPart ? rowsPart.row : [];
+  return { rows: rowsPart ? rowsPart.row : [], totalCount };
 }
 
-export async function callNeis(apiKey, endpoint, params) {
+async function fetchNeisPage(apiKey, endpoint, params, pIndex, pSize) {
   const url = new URL(`${NEIS_BASE}/${endpoint}`);
   url.searchParams.set('KEY', apiKey);
   url.searchParams.set('Type', 'json');
-  url.searchParams.set('pIndex', '1');
-  url.searchParams.set('pSize', String(params.pSize || 100));
+  url.searchParams.set('pIndex', String(pIndex));
+  url.searchParams.set('pSize', String(pSize));
 
   for (const [key, value] of Object.entries(params)) {
-    if (key === 'pSize') continue;
+    if (key === 'pSize' || key === 'pIndex') continue;
     if (value === undefined || value === null || value === '') continue;
     url.searchParams.set(key, value);
   }
@@ -102,4 +108,28 @@ export async function callNeis(apiKey, endpoint, params) {
   }
 
   return parseNeisPayload(json, endpoint);
+}
+
+export async function callNeis(apiKey, endpoint, params) {
+  const { rows } = await fetchNeisPage(apiKey, endpoint, params, 1, params.pSize || 100);
+  return rows;
+}
+
+const MAX_PAGES = 5;
+
+// NEIS's mealServiceDietInfo endpoint has been observed to ignore
+// MLSV_FROMYMD/MLSV_TOYMD filtering and just return the school's full
+// meal history page by page, oldest first. A single small page can miss
+// recent dates entirely, so pull pages until we have everything (or hit
+// a safety cap).
+export async function callNeisAllPages(apiKey, endpoint, params, pageSize = 1000) {
+  let allRows = [];
+  let pIndex = 1;
+  while (pIndex <= MAX_PAGES) {
+    const { rows, totalCount } = await fetchNeisPage(apiKey, endpoint, params, pIndex, pageSize);
+    allRows = allRows.concat(rows);
+    if (rows.length < pageSize || allRows.length >= totalCount) break;
+    pIndex++;
+  }
+  return allRows;
 }
