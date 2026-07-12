@@ -6,7 +6,7 @@ export async function onRequestGet(context) {
   return jsonResponse({
     ok: true,
     data: {
-      systemName: '맛마음 탐험소 Lite',
+      systemName: '맛마음 탐험소 by.미네쌤',
       version: '1.0.0',
       today: formatDateDisplay(getKstDateString(0)),
       neisKeyRegistered: Boolean(env.NEIS_API_KEY),
