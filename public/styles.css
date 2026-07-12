@@ -1055,3 +1055,11 @@ input[type="range"] {
     padding: 0.9rem 1rem;
   }
 }
+
+.app-footer {
+  padding: 1.5rem 1rem 2rem;
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  line-height: 1.6;
+}
